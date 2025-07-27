@@ -123,6 +123,14 @@ function generateAttributeProperty(
 
   lines.push(`${propertyName}${optionalMarker}: ${typeString};${additionalInfo}`)
 
+  // Add _value property for lookup fields when includeLookupValues is enabled
+  if (attribute.attributeType === 'Lookup' && options.includeLookupValues) {
+    const valueProperty = `_${attribute.logicalName}_value`
+    const valueComment = includeComments ? `/** ${valueProperty} - Resolved lookup GUID value */` : ''
+    if (valueComment) lines.push(valueComment)
+    lines.push(`${valueProperty}?: string; // Lookup value`)
+  }
+
   return lines
 }
 
@@ -364,18 +372,180 @@ export function generateEntityFile(
   // Generate main entity interface
   const interfaces = generateEntityInterface(entityMetadata, options)
 
+  // Generate binding types if enabled
+  const bindingTypes = options.includeBindingTypes 
+    ? generateBindingTypes(entityMetadata, options)
+    : undefined
+
   // Generate metadata object
   const metadata = options.includeMetadata 
     ? generateMetadataObject(entityMetadata, options)
     : undefined
 
-  return {
+  // Combine all type definitions
+  const allTypes = [
     interfaces,
+    bindingTypes,
+    metadata
+  ].filter(Boolean).join('\n\n')
+
+  return {
+    interfaces: allTypes,
     constants: constants.join('\n'),
     types: '', // No utility types are generated anymore
-    metadata,
+    metadata: undefined, // Already included in interfaces
     imports: Array.from(imports)
   }
+}
+
+/**
+ * Convert schema name to proper Pascal case type name
+ * Example: "pum_CostResource" -> "PumCostResource"
+ */
+function toPascalCaseTypeName(schemaName: string): string {
+  // Handle names that start with lowercase prefix followed by underscore and PascalCase
+  // e.g., "pum_CostResource" -> "PumCostResource"
+  if (schemaName.includes('_')) {
+    const parts = schemaName.split('_')
+    return parts.map(part => 
+      part.charAt(0).toUpperCase() + part.slice(1)
+    ).join('')
+  }
+  
+  // For names that are already in the right format, just ensure first letter is uppercase
+  return schemaName.charAt(0).toUpperCase() + schemaName.slice(1)
+}
+
+/**
+ * Generate binding types for @odata.bind operations
+ */
+function generateBindingTypes(
+  entityMetadata: ProcessedEntityMetadata,
+  options: TypeGenerationOptions
+): string {
+  const { includeComments = true } = options
+  
+  // Filter out read-only system fields that cannot be set via @odata.bind
+  const readOnlySystemFields = new Set([
+    'createdby',
+    'modifiedby', 
+    'createdonbehalfby',
+    'modifiedonbehalfby',
+    'owninguser',
+    'owningteam',
+    'owningbusinessunit'
+  ])
+  
+  const lookupAttributes = entityMetadata.attributes.filter(attr => 
+    attr.attributeType === 'Lookup' && !readOnlySystemFields.has(attr.logicalName)
+  )
+  
+  if (lookupAttributes.length === 0) {
+    return ''
+  }
+
+  const lines: string[] = []
+  const pascalTypeName = toPascalCaseTypeName(entityMetadata.schemaName)
+  
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Binding types for ${entityMetadata.schemaName} @odata.bind operations`)
+    lines.push(` */`)
+  }
+  
+  lines.push(`export type ${pascalTypeName}Bindings = {`)
+  
+  for (const attr of lookupAttributes) {
+    const bindingProperty = `${attr.schemaName}@odata.bind`
+    const targets = attr.targets && attr.targets.length > 0 ? ` // Bind to: ${attr.targets.join(', ')}` : ''
+    lines.push(`  '${bindingProperty}'?: string;${targets}`)
+  }
+  
+  lines.push(`};`)
+  
+  // Generate type-safe binding helper functions
+  lines.push('')
+  lines.push(`/**`)
+  lines.push(` * Type-safe helper functions for creating ${entityMetadata.schemaName} @odata.bind relationships`)
+  lines.push(` * Each function returns the correct entity set path for the target entity`)
+  lines.push(` */`)
+  lines.push(`export const ${pascalTypeName}Bindings = {`)
+  
+  for (const attr of lookupAttributes) {
+    const functionName = attr.logicalName
+    const targets = attr.targets || []
+    
+    if (targets.length === 1) {
+      // Single target - type-safe function
+      const target = targets[0]
+      const entitySet = getEntitySetForTarget(target)
+      lines.push(`  /** Create @odata.bind for ${attr.logicalName} -> ${target} */`)
+      lines.push(`  ${functionName}: (id: string): { '${attr.schemaName}@odata.bind': string } => ({`)
+      lines.push(`    '${attr.schemaName}@odata.bind': \`/${entitySet}(\${id})\``)
+      lines.push(`  }),`)
+    } else if (targets.length > 1) {
+      // Multiple targets - require entity type parameter
+      lines.push(`  /** Create @odata.bind for ${attr.logicalName} -> ${targets.join(' | ')} */`)
+      lines.push(`  ${functionName}: (id: string, entityType: '${targets.join("' | '")}') => {`)
+      lines.push(`    const entitySets = {`)
+      targets.forEach(target => {
+        const entitySet = getEntitySetForTarget(target)
+        lines.push(`      '${target}': '${entitySet}',`)
+      })
+      lines.push(`    } as const;`)
+      lines.push(`    return { '${attr.schemaName}@odata.bind': \`/\${entitySets[entityType]}(\${id})\` };`)
+      lines.push(`  },`)
+    } else {
+      // No targets specified - generic function
+      lines.push(`  /** Create @odata.bind for ${attr.logicalName} (generic) */`)
+      lines.push(`  ${functionName}: (id: string, entitySet: string): { '${attr.schemaName}@odata.bind': string } => ({`)
+      lines.push(`    '${attr.schemaName}@odata.bind': \`/\${entitySet}(\${id})\``)
+      lines.push(`  }),`)
+    }
+  }
+  
+  lines.push(`} as const;`)
+  
+  // Add Create and Update utility types with bindings
+  lines.push('')
+  lines.push(`export type ${pascalTypeName}Create = Partial<${entityMetadata.schemaName}> & Partial<${pascalTypeName}Bindings> & {`)
+  lines.push(`  ${entityMetadata.primaryNameAttribute}: string; // Required for create`)
+  lines.push(`};`)
+  
+  lines.push('')
+  lines.push(`export type ${pascalTypeName}Update = Partial<Omit<${entityMetadata.schemaName}, '${entityMetadata.primaryIdAttribute}'>> & Partial<${pascalTypeName}Bindings> & {`)
+  lines.push(`  ${entityMetadata.primaryIdAttribute}: string; // Required for update`)
+  lines.push(`};`)
+  
+  return lines.join('\n')
+}
+
+/**
+ * Get the entity set name for a target entity type
+ */
+function getEntitySetForTarget(target?: string): string {
+  if (!target) return 'entities'
+  
+  // Common entity set mappings
+  const entitySetMap: Record<string, string> = {
+    'systemuser': 'systemusers',
+    'team': 'teams', 
+    'businessunit': 'businessunits',
+    'transactioncurrency': 'transactioncurrencies'
+  }
+  
+  // Check if we have a specific mapping
+  if (entitySetMap[target]) {
+    return entitySetMap[target]
+  }
+  
+  // For custom entities, typically add 's' to the end
+  if (target.includes('_')) {
+    return `${target}s`
+  }
+  
+  // Default fallback
+  return `${target}s`
 }
 
 /**

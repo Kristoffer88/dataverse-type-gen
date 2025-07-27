@@ -373,7 +373,7 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
     let entitiesToProcess: string[] = []
 
     // Determine which entities to generate
-    if (config.entities) {
+    if (config.entities?.length) {
       // Handle both comma-separated strings and arrays
       if (Array.isArray(config.entities)) {
         entitiesToProcess = config.entities.flatMap(entity => 
@@ -395,6 +395,10 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
       entitiesToProcess = publisherEntities.map(e => e.LogicalName)
       logger.success(`Found ${entitiesToProcess.length} entities for publisher ${config.publisher}`)
       
+      if (config.debug && entitiesToProcess.length > 0) {
+        logger.debugLog(`Entities to process: ${entitiesToProcess.slice(0, 10).join(', ')}${entitiesToProcess.length > 10 ? '...' : ''}`)
+      }
+      
     } else if (config.solution) {
       logger.info(`🔍 Discovering entities for solution: ${config.solution}`)
       const solutionEntities = await fetchSolutionEntities(config.solution)
@@ -410,7 +414,22 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
     }
 
     if (entitiesToProcess.length === 0) {
-      logger.warning('No entities found to process')
+      logger.warning('⚠️  No entities found to process')
+      
+      if (config.debug) {
+        logger.debugLog('Debugging entity discovery:')
+        if (config.entities) {
+          logger.debugLog(`  - Searched for specific entities: ${JSON.stringify(config.entities)}`)
+        } else if (config.publisher) {
+          logger.debugLog(`  - Searched for publisher prefix: '${config.publisher}'`)
+          logger.debugLog(`  - Expected entities to start with: '${config.publisher}_'`)
+        } else if (config.solution) {
+          logger.debugLog(`  - Searched for solution: '${config.solution}'`)
+        } else {
+          logger.debugLog('  - Searched for all custom entities')
+        }
+      }
+      
       return
     }
 
@@ -472,6 +491,8 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
         includeComments: config.includeComments,
         includeMetadata: config.includeMetadata,
         includeValidation: config.includeValidation,
+        includeLookupValues: (config as { typeGeneration?: { includeLookupValues?: boolean } }).typeGeneration?.includeLookupValues ?? true,
+        includeBindingTypes: (config as { typeGeneration?: { includeBindingTypes?: boolean } }).typeGeneration?.includeBindingTypes ?? true,
       }
     }
     

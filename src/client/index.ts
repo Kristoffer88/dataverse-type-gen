@@ -357,9 +357,12 @@ export async function fetchPublisherEntities(
     })
     
     // Filter client-side by publisher prefix
+    const filterPattern = `${publisherPrefix}_`
     const solutionEntities = allCustomEntities.filter(entity => 
-      entity.LogicalName.startsWith(`${publisherPrefix}_`)
+      entity.LogicalName.startsWith(filterPattern)
     )
+    
+    // Note: If no entities found, solutionEntities will be empty array
     
     return solutionEntities
     

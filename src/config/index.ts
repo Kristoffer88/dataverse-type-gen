@@ -115,7 +115,7 @@ async function loadConfigFile(configPath?: string): Promise<Partial<DataverseTyp
       const fullPath = resolve(fileName)
       const config = await loadSingleConfigFile(fullPath)
       if (config) {
-        console.log(`📄 Loaded configuration from: ${fileName}`)
+        // Configuration loaded successfully
         return config
       }
     } catch {
