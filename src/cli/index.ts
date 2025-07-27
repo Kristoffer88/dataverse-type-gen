@@ -119,7 +119,7 @@ function validateDataverseUrl(url: string): { isValid: boolean; message?: string
 async function promptForDataverseUrl(logger: SimpleLogger): Promise<string> {
   logger.info('Dataverse URL is required but not configured.')
   logger.info('You can set it via:')
-  logger.info('  • Environment variable: VITE_DATAVERSE_INSTANCE=https://yourorg.crm.dynamics.com')
+  logger.info('  • Environment variable: DATAVERSE_INSTANCE=https://yourorg.crm.dynamics.com')
   logger.info('  • Command line option: --dataverse-url https://yourorg.crm.dynamics.com')
   logger.info('  • Configuration file')
   console.log()
@@ -359,15 +359,15 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
     logger.debugLog(`Configuration: ${JSON.stringify(config, null, 2)}`)
 
     // Validate and ensure Dataverse URL is available
-    if (!process.env.VITE_DATAVERSE_INSTANCE && !process.env.DATAVERSE_INSTANCE && !config.dataverseUrl) {
+    if (!process.env.DATAVERSE_INSTANCE && !config.dataverseUrl) {
       // Interactively prompt for URL
       config.dataverseUrl = await promptForDataverseUrl(logger)
     }
     
     // Set the environment variable for the auth system to use
     if (config.dataverseUrl) {
-      process.env.VITE_DATAVERSE_INSTANCE = config.dataverseUrl
-      logger.debugLog(`Set VITE_DATAVERSE_INSTANCE to: ${config.dataverseUrl}`)
+      process.env.DATAVERSE_INSTANCE = config.dataverseUrl
+      logger.debugLog(`Set DATAVERSE_INSTANCE to: ${config.dataverseUrl}`)
     }
 
     let entitiesToProcess: string[] = []
@@ -606,7 +606,7 @@ async function initCommand(options: Record<string, unknown>): Promise<void> {
     logger.info(``)
     logger.info(`🎯 Next steps:`)
     logger.info(`   1. Configure your Dataverse connection:`)
-    logger.info(`      export VITE_DATAVERSE_INSTANCE="https://yourorg.crm.dynamics.com"`)
+    logger.info(`      export DATAVERSE_INSTANCE="https://yourorg.crm.dynamics.com"`)
     logger.info(`   2. Edit ${configPath} to specify entities, publisher, or solution`)
     logger.info(`   3. Run: npx dataverse-type-gen generate`)
     logger.info(``)
@@ -633,9 +633,9 @@ async function validateCommand(options: Record<string, unknown>): Promise<void> 
     logger.info('🔍 Validating Dataverse connection and configuration...')
     
     // Check environment variables
-    const dataverseUrl = process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE
+    const dataverseUrl = process.env.DATAVERSE_INSTANCE
     if (!dataverseUrl) {
-      logger.error('VITE_DATAVERSE_INSTANCE or DATAVERSE_INSTANCE environment variable not set')
+      logger.error('DATAVERSE_INSTANCE environment variable not set')
       process.exit(1)
     }
     
@@ -762,7 +762,6 @@ Examples:
       console.log(chalk.blue('📋 Dataverse Type Generator'))
       console.log('')
       console.log('🔗 Environment Variables:')
-      console.log(`   VITE_DATAVERSE_INSTANCE: ${process.env.VITE_DATAVERSE_INSTANCE || 'Not set'}`)
       console.log(`   DATAVERSE_INSTANCE: ${process.env.DATAVERSE_INSTANCE || 'Not set'}`)
       console.log('')
       console.log('📁 Current Directory:', process.cwd())

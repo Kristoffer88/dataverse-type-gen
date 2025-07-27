@@ -94,7 +94,7 @@ export async function generateTypes(options: GenerateTypesOptions = {}): Promise
     throw new Error('Cannot specify both publisher and solution - choose one discovery method')
   }
   
-  if (!config.dataverseUrl && !process.env.VITE_DATAVERSE_INSTANCE && !process.env.DATAVERSE_INSTANCE) {
+  if (!config.dataverseUrl && !process.env.DATAVERSE_INSTANCE) {
     throw new Error('Dataverse URL must be configured via dataverseUrl option or environment variables')
   }
   

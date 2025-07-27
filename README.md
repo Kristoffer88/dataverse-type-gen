@@ -17,9 +17,9 @@ Generate TypeScript types from Microsoft Dataverse metadata with enterprise-grad
 ### Installation
 
 ```bash
-npm install @pcf-vibe/dataverse-type-gen
+npm install dataverse-type-gen
 # or
-pnpm add @pcf-vibe/dataverse-type-gen
+pnpm add dataverse-type-gen
 ```
 
 ### Basic Usage
@@ -46,7 +46,7 @@ npx dataverse-type-gen generate --entities account --dry-run
 **Programmatic API:**
 
 ```typescript
-import { generateMultipleEntityTypes } from '@pcf-vibe/dataverse-type-gen'
+import { generateMultipleEntityTypes } from 'dataverse-type-gen'
 
 // Generate types for specific entities
 const result = await generateMultipleEntityTypes(processedEntities, {
@@ -65,7 +65,7 @@ const result = await generateMultipleEntityTypes(processedEntities, {
 Set your Dataverse instance URL:
 
 ```bash
-export VITE_DATAVERSE_INSTANCE="https://yourorg.crm.dynamics.com"
+export DATAVERSE_INSTANCE="https://yourorg.crm.dynamics.com"
 ```
 
 Or specify via CLI:
@@ -277,8 +277,7 @@ Shows:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `VITE_DATAVERSE_INSTANCE` | Dataverse instance URL | `https://yourorg.crm.dynamics.com` |
-| `DATAVERSE_INSTANCE` | Alternative instance URL | `https://yourorg.crm.dynamics.com` |
+| `DATAVERSE_INSTANCE` | Dataverse instance URL | `https://yourorg.crm.dynamics.com` |
 
 ## Authentication
 
@@ -398,33 +397,6 @@ pnpm test:watch
 - **Selective Properties**: OData filtering for minimal data transfer
 - **Retry Logic**: Handles transient network failures
 
-## API Limitations & Workarounds
-
-This package includes comprehensive handling for Dataverse API limitations:
-
-- **EntityDefinitions**: No `$top`/`$skip` pagination support
-- **String Functions**: `startswith()` not supported on EntityDefinitions
-- **Client-side Filtering**: Used where server-side filtering unavailable
-- **Error Code Mapping**: Detailed error handling with actionable hints
-
-See `API-KNOWLEDGE.md` for complete documentation of discovered limitations.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Make your changes with tests
-4. Run quality checks: `pnpm quality`
-5. Submit a pull request
-
-### Code Standards
-
-- **TypeScript**: Strict mode with comprehensive types
-- **Testing**: Integration tests with real Dataverse API
-- **Linting**: ESLint with TypeScript rules
-- **Formatting**: Consistent code style
-- **Documentation**: Complete API documentation
-
 ## License
 
 ISC License - see LICENSE file for details.
@@ -454,21 +426,6 @@ npx dataverse-type-gen generate --solution "Production Solution" --quiet --outpu
 
 # Custom output configuration
 npx dataverse-type-gen generate --entities account --output-dir ./src/types --file-extension .d.ts --no-validation
-```
-
-### CI/CD Integration
-
-```yaml
-# GitHub Actions example
-- name: Generate Dataverse Types
-  run: |
-    npx dataverse-type-gen generate \
-      --solution "My Solution" \
-      --output-format json \
-      --quiet \
-      > type-generation-report.json
-  env:
-    VITE_DATAVERSE_INSTANCE: ${{ secrets.DATAVERSE_INSTANCE }}
 ```
 
 **Built with modern CLI best practices for 2025** 🚀

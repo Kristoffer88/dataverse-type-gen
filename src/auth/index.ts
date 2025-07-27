@@ -267,9 +267,9 @@ export function createAuthenticatedFetcher(
         } else {
           // For relative URLs, we need a way to determine the base URL
           // This would typically come from configuration or environment
-          const dataverseInstance = process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE
+          const dataverseInstance = process.env.DATAVERSE_INSTANCE
           if (!dataverseInstance) {
-            throw new Error('Cannot determine Dataverse instance URL. Please provide resourceUrl or set VITE_DATAVERSE_INSTANCE/DATAVERSE_INSTANCE environment variable.')
+            throw new Error('Cannot determine Dataverse instance URL. Please provide resourceUrl or set DATAVERSE_INSTANCE environment variable.')
           }
           authResourceUrl = dataverseInstance.endsWith('/') ? dataverseInstance : `${dataverseInstance}/`
         }

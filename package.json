@@ -36,7 +36,7 @@
         "dynamics-365",
         "power-platform"
     ],
-    "author": "",
+    "author": "Kristoffer Rasmussen",
     "license": "ISC",
     "engines": {
         "node": ">=18"
@@ -58,9 +58,18 @@
         "commander": "^14.0.0",
         "ts-morph": "^26.0.0"
     },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Kristoffer88/dataverse-type-gen.git"
+    },
+    "homepage": "https://github.com/Kristoffer88/dataverse-type-gen#readme",
+    "bugs": {
+        "url": "https://github.com/Kristoffer88/dataverse-type-gen/issues"
+    },
     "files": [
         "dist",
         "README.md",
+        "LICENSE",
         "dataverse.config.json"
     ]
 }

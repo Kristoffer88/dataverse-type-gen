@@ -113,3 +113,8 @@ tmp/
 
 # Vitest
 .vitest/
+
+generated
+test-output
+
+msdocs

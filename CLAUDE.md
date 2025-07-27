@@ -26,7 +26,7 @@ The generator transforms EntityMetadata, AttributeMetadata, and OptionSetMetadat
 - Use the provided `getAzureAccessToken(resourceUrl: string)` function for authentication
 - Use relative URLs to API endpoints, not full URLs
 - Do not call authentication setup inside tests - it's done in setup
-- Follow existing test infrastructure patterns from the monorepo
+- Follow established test infrastructure patterns
 
 ### Metadata Processing Patterns
 
@@ -158,8 +158,8 @@ if (!response.ok) {
 
 **Test Structure:**
 
-- Integration tests in `../../integration/` directory
-- Use existing monorepo test infrastructure and patterns
+- Integration tests in `tests/integration/` directory
+- Use established test infrastructure patterns
 - Follow the authentication abstraction already established
 - Test against real publisher/solution/table configurations
 - **Failing tests are valuable** - they reveal API limitations to document
@@ -169,7 +169,7 @@ if (!response.ok) {
 **Package Structure:**
 
 ```
-packages/dataverse-type-gen/
+dataverse-type-gen/
 ├── src/
 │   ├── auth/           # Authentication with MSAL
 │   ├── client/         # Metadata API client
@@ -177,9 +177,13 @@ packages/dataverse-type-gen/
 │   ├── generators/     # Type generators
 │   ├── codegen/        # Code generation
 │   ├── cli/            # CLI interface
+│   ├── config/         # Configuration management
+│   ├── error-logger.ts # Advanced error logging
 │   └── index.ts        # Public API
-├── tests/              # Integration tests
-├── index.md            # Quick reference
-├── plans/              # Implementation plans
-└── split-docs.sh       # Documentation utilities
+├── tests/
+│   ├── integration/    # Integration tests
+│   └── setup-integration.ts
+├── docs/               # Documentation
+├── API-KNOWLEDGE.md    # API limitations & discoveries
+└── dataverse.config.json # Default configuration
 ```

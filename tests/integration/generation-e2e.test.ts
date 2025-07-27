@@ -24,7 +24,7 @@ import { promises as fs } from 'fs'
 import { join } from 'path'
 
 describe('Full Generation Pipeline Integration Tests', () => {
-  const dataverseInstance = process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE
+  const dataverseInstance = process.env.DATAVERSE_INSTANCE
   
   // Skip tests if no Dataverse instance configured
   const skipCondition = !dataverseInstance
@@ -333,12 +333,12 @@ describe('Full Generation Pipeline Integration Tests', () => {
 
 // Helper to run integration tests in isolation
 if (import.meta.vitest) {
-  const testDataverseInstance = process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE
+  const testDataverseInstance = process.env.DATAVERSE_INSTANCE
   console.log('🎯 Full Generation Pipeline Tests Configuration:')
   console.log(`   DATAVERSE_INSTANCE: ${testDataverseInstance || 'NOT SET'}`)
   console.log(`   Tests will be ${!testDataverseInstance ? 'SKIPPED' : 'EXECUTED'}`)
   
   if (!testDataverseInstance) {
-    console.warn('⚠️  Set VITE_DATAVERSE_INSTANCE or DATAVERSE_INSTANCE environment variable to run integration tests')
+    console.warn('⚠️  Set DATAVERSE_INSTANCE environment variable to run integration tests')
   }
 }

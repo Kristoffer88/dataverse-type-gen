@@ -24,7 +24,7 @@ import {
 import { advancedLog } from '../../src/error-logger.js'
 
 describe('Metadata Fetching and Processing', () => {
-  const dataverseInstance = process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE
+  const dataverseInstance = process.env.DATAVERSE_INSTANCE
   
   // Skip tests if no Dataverse instance configured
   const skipCondition = !dataverseInstance
@@ -461,12 +461,12 @@ describe('Metadata Fetching and Processing', () => {
 
 // Helper to run metadata tests in isolation
 if (import.meta.vitest) {
-  const testDataverseInstance = process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE
+  const testDataverseInstance = process.env.DATAVERSE_INSTANCE
   console.log('📊 Metadata Tests Configuration:')
   console.log(`   DATAVERSE_INSTANCE: ${testDataverseInstance || 'NOT SET'}`)
   console.log(`   Tests will be ${!testDataverseInstance ? 'SKIPPED' : 'EXECUTED'}`)
   
   if (!testDataverseInstance) {
-    console.warn('⚠️  Set VITE_DATAVERSE_INSTANCE or DATAVERSE_INSTANCE environment variable to run metadata tests')
+    console.warn('⚠️  Set DATAVERSE_INSTANCE environment variable to run metadata tests')
   }
 }

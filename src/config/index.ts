@@ -193,8 +193,8 @@ function applyEnvironmentVariables(config: DataverseTypeGenConfig): DataverseTyp
   const result = { ...config }
   
   // Dataverse URL
-  if (process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE) {
-    result.dataverseUrl = process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE
+  if (process.env.DATAVERSE_INSTANCE) {
+    result.dataverseUrl = process.env.DATAVERSE_INSTANCE
   }
   
   // Output directory
@@ -265,7 +265,7 @@ export function validateConfiguration(config: DataverseTypeGenConfig): {
   }
   
   // Dataverse connection
-  if (!config.dataverseUrl && !process.env.VITE_DATAVERSE_INSTANCE && !process.env.DATAVERSE_INSTANCE) {
+  if (!config.dataverseUrl && !process.env.DATAVERSE_INSTANCE) {
     errors.push('Dataverse URL must be configured via config.dataverseUrl or environment variables')
   }
   

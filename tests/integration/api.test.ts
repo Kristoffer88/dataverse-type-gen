@@ -11,7 +11,7 @@ import { getEntityDefinitions } from '../../src/metadata-client.js'
 import { advancedLog } from '../../src/error-logger.js'
 
 describe('Authentication System', () => {
-  const dataverseInstance = process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE
+  const dataverseInstance = process.env.DATAVERSE_INSTANCE
   
   // Skip tests if no Dataverse instance configured
   const skipCondition = !dataverseInstance
@@ -201,12 +201,12 @@ describe('Authentication System', () => {
 
 // Helper to run authentication tests in isolation
 if (import.meta.vitest) {
-  const testDataverseInstance = process.env.VITE_DATAVERSE_INSTANCE || process.env.DATAVERSE_INSTANCE
+  const testDataverseInstance = process.env.DATAVERSE_INSTANCE
   console.log('🔐 Authentication Tests Configuration:')
   console.log(`   DATAVERSE_INSTANCE: ${testDataverseInstance || 'NOT SET'}`)
   console.log(`   Tests will be ${!testDataverseInstance ? 'SKIPPED' : 'EXECUTED'}`)
   
   if (!testDataverseInstance) {
-    console.warn('⚠️  Set VITE_DATAVERSE_INSTANCE or DATAVERSE_INSTANCE environment variable to run authentication tests')
+    console.warn('⚠️  Set DATAVERSE_INSTANCE environment variable to run authentication tests')
   }
 }

@@ -21,16 +21,16 @@ The testing infrastructure provides:
 ## Test Structure
 
 ```
-packages/dataverse-type-gen/
+dataverse-type-gen/
 ├── src/
-│   ├── test-utils.ts            # Simple mock data utilities
-│   └── testing/
-│       └── index.ts             # Basic testing helpers
+│   ├── *.test.ts                # Unit tests alongside source code
+│   └── error-logger.ts          # Advanced error logging utilities
 ├── tests/
 │   ├── integration/
 │   │   ├── api.test.ts          # Real Dataverse API tests
 │   │   ├── metadata.test.ts     # Metadata processing tests
-│   │   └── generation-e2e.test.ts # End-to-end generation tests
+│   │   ├── generation-e2e.test.ts # End-to-end generation tests
+│   │   └── optionset-debug.test.ts # OptionSet debugging tests
 │   └── setup-integration.ts     # Test setup and configuration
 ```
 
@@ -65,10 +65,26 @@ Integration tests run against real Dataverse API endpoints to ensure:
 Set required environment variables:
 
 ```bash
-export VITE_DATAVERSE_INSTANCE="https://yourorg.crm.dynamics.com"
-export VITE_AZURE_CLIENT_ID="your-app-registration-id"
-export VITE_AZURE_TENANT_ID="your-tenant-id"
+export DATAVERSE_INSTANCE="https://yourorg.crm.dynamics.com"
 ```
+
+### Authentication
+
+This project uses **Azure Identity** for authentication, which automatically handles multiple credential types:
+
+1. **Azure CLI** (recommended for development):
+   ```bash
+   az login
+   ```
+
+2. **Managed Identity** (automatic in Azure environments)
+3. **Environment Variables** (for service principals):
+   ```bash
+   export AZURE_CLIENT_ID="your-app-registration-id"
+   export AZURE_CLIENT_SECRET="your-client-secret"
+   export AZURE_TENANT_ID="your-tenant-id"
+   ```
+4. **Visual Studio/VS Code** integrated authentication
 
 ### Test Configuration
 
@@ -76,30 +92,24 @@ Integration tests use real authentication and API calls. No mocking is used to e
 
 ## Test Utilities
 
-### Mock Data Generation
+### Error Logging and Debugging
 
-Simple utilities for creating test data:
-
-```typescript
-import { createMockData } from '../src/testing/index.js'
-import { createMockEntityMetadata } from '../src/test-utils.js'
-
-// Create mock entity metadata
-const mockEntity = createMockEntityMetadata('account')
-
-// Generate simple test data
-const testData = createMockData(processedEntity, 5)
-```
-
-### Basic Helpers
+The project includes advanced error logging utilities:
 
 ```typescript
-// Generate simple GUID for testing
-function generateGuid(): string
+import { advancedLog } from '../src/error-logger.js'
 
-// Create mock attribute metadata
-function createMockAttributeMetadata(name: string, type: string): unknown
+// Log detailed API error information
+if (!response.ok) {
+  await advancedLog(response, url, 'GET')
+}
 ```
+
+This provides:
+- Exact error codes (e.g., `0x80060888`)
+- Request URLs and parameters that caused errors
+- Dataverse-specific error annotations and trace text
+- Help links and operation status details
 
 ## Development Workflows
 
@@ -118,9 +128,11 @@ function createMockAttributeMetadata(name: string, type: string): unknown
 ### Debugging Tests
 
 1. **Enable Verbose Logging**: Use `--verbose` flag with test runner
-2. **Check Environment**: Ensure all required environment variables are set
-3. **Network Issues**: Verify Dataverse instance is accessible
-4. **Authentication**: Check Azure app registration permissions
+2. **Check Environment**: Ensure `DATAVERSE_INSTANCE` environment variable is set
+3. **Authentication**: Ensure you're logged in with Azure CLI (`az login`)
+4. **Network Issues**: Verify Dataverse instance is accessible
+5. **Permissions**: Check that your user has read permissions on Dataverse metadata
+6. **API Limitations**: Check `API-KNOWLEDGE.md` for known API limitations and workarounds
 
 ## Best Practices
 

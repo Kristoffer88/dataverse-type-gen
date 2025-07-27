@@ -6,6 +6,11 @@ export default defineConfig({
     environment: 'node',
     testTimeout: 30000,
     hookTimeout: 30000,
+    env: {
+      // Load .env file for tests
+      NODE_ENV: 'test'
+    },
+    setupFiles: ['./tests/setup-env.ts'],
     include: [
       'src/**/*.test.ts',
       'tests/unit/**/*.test.ts',

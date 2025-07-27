@@ -6,7 +6,7 @@
 // Required environment variables for integration tests
 // Azure Identity handles authentication automatically (Azure CLI, Managed Identity, etc.)
 const REQUIRED_ENV_VARS = [
-  'VITE_DATAVERSE_INSTANCE'
+  'DATAVERSE_INSTANCE'
 ] as const
 
 /**
@@ -33,7 +33,7 @@ export function validateIntegrationEnvironment(): void {
       ...missing.map(v => `  - ${v}`),
       '',
       'Setup instructions:',
-      '1. Set VITE_DATAVERSE_INSTANCE to your Dataverse environment URL',
+      '1. Set DATAVERSE_INSTANCE to your Dataverse environment URL',
       '2. Ensure you are authenticated with Azure CLI: `az login`',  
       '3. Or set up other Azure Identity credentials (Managed Identity, etc.)',
       '',
@@ -47,7 +47,7 @@ export function validateIntegrationEnvironment(): void {
   
   // Log successful configuration
   console.log('✅ Integration test environment validated')
-  console.log(`   Dataverse: ${values.VITE_DATAVERSE_INSTANCE}`)
+  console.log(`   Dataverse: ${values.DATAVERSE_INSTANCE}`)
   console.log(`   Authentication: Azure Identity (automatic)`)
 }
 
