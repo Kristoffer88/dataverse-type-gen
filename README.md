@@ -91,13 +91,6 @@ npx dataverse-type-gen generate --entities account --debug
 npx dataverse-type-gen generate --entities account --output-format json
 ```
 
-### 🚦 Visual Progress & Feedback
-
-- **Progress bars**: Visual progress with Unicode block characters
-- **Smart logging**: Contextual messages with actionable error hints
-- **Statistics**: Detailed generation reports with file counts and sizes
-- **Input validation**: Early error detection with helpful suggestions
-
 ### ⚙️ Advanced Configuration
 
 ```bash
@@ -164,6 +157,25 @@ export const AccountMetadata = {
     // ... complete attribute metadata
   }
 } as const
+```
+
+### Lookup Properties & Bindings
+
+Generates lookup properties (`_xx_value`) and type-safe `@odata.bind` helpers:
+
+```typescript
+export interface Account {
+  primarycontactid?: string
+  _primarycontactid_value?: string; // Lookup property - GUID value
+}
+
+export type AccountBindings = {
+  'PrimaryContactId@odata.bind'?: string; // Bind to: contact
+};
+
+export const AccountBindings = {
+  primarycontactid: (id: string) => ({ 'PrimaryContactId@odata.bind': `/contacts(${id})` })
+};
 ```
 
 ## CLI Commands
@@ -292,9 +304,7 @@ This package uses **Azure Identity** for secure authentication with multiple cre
 
 ### Required Permissions
 
-Your Azure AD app registration needs:
-- **API Permissions**: `Dynamics CRM` → `user_impersonation`
-- **Dataverse User**: System user with read permissions on metadata
+- **Dataverse User**: App user with read permissions on metadata
 
 ### Token Caching
 
@@ -303,129 +313,6 @@ Authentication tokens are automatically cached:
 - **Disk cache**: `~/.dataverse-type-gen/token-cache.json`
 - **Automatic refresh**: Handles token expiry transparently
 
-## Error Handling & Troubleshooting
-
-### Common Issues
-
-**Connection Failed:**
-```bash
-# Test your connection
-npx dataverse-type-gen validate --debug
-
-# Check authentication
-az login
-az account show
-```
-
-**Invalid Entity Names:**
-```bash
-# Use valid Dataverse logical names (lowercase, underscore separated)
-npx dataverse-type-gen generate --entities account --debug
-```
-
-**Permission Errors:**
-```bash
-# Check output directory permissions
-npx dataverse-type-gen generate --entities account --debug
-```
-
-### Debug Mode
-
-Enable comprehensive logging:
-```bash
-npx dataverse-type-gen generate --entities account --debug
-```
-
-Provides:
-- Configuration details
-- API request/response logging
-- Token acquisition details  
-- Detailed error context with actionable hints
-
-## Development
-
-### Build Commands
-
-```bash
-# Install dependencies
-pnpm install
-
-# Build package
-pnpm build
-
-# Run tests
-pnpm test
-
-# Quality checks (lint + types + tests)
-pnpm quality
-
-# Full CI pipeline
-pnpm ci
-```
-
-### Testing
-
-```bash
-# Run integration tests (requires Dataverse connection)
-pnpm test
-
-# Run with coverage
-pnpm test:coverage
-
-# Watch mode
-pnpm test:watch
-```
-
-**Note**: Tests use real Dataverse API calls, not mocks, ensuring reliable validation.
-
-## Architecture
-
-### Core Components
-
-- **CLI** (`src/cli/`): Commander.js-based interface with modern UX
-- **Authentication** (`src/auth/`): Azure Identity integration with caching
-- **Client** (`src/client/`): Optimized Dataverse Web API calls
-- **Processors** (`src/processors/`): Transform raw metadata to structured data
-- **Generators** (`src/generators/`): Create TypeScript code from processed metadata
-- **Code Generation** (`src/codegen/`): File system operations with formatting
-
-### Performance Features
-
-- **Request Caching**: Avoids duplicate API calls
-- **Batch Processing**: Efficient handling of multiple entities
-- **Token Caching**: Reduces authentication overhead
-- **Selective Properties**: OData filtering for minimal data transfer
-- **Retry Logic**: Handles transient network failures
-
 ## License
 
-ISC License - see LICENSE file for details.
-
----
-
-## Examples
-
-### Basic Entity Generation
-
-```bash
-# Generate types for CRM entities
-npx dataverse-type-gen generate --entities account,contact,lead,opportunity
-
-# Generate types for custom entities only
-npx dataverse-type-gen generate --publisher your_prefix
-```
-
-### Advanced Workflows
-
-```bash
-# Development workflow with preview
-npx dataverse-type-gen generate --entities account --dry-run --debug
-
-# Production deployment with automation
-npx dataverse-type-gen generate --solution "Production Solution" --quiet --output-format json
-
-# Custom output configuration
-npx dataverse-type-gen generate --entities account --output-dir ./src/types --file-extension .d.ts --no-validation
-```
-
-**Built with modern CLI best practices for 2025** 🚀
+MIT License - see LICENSE file for details.
