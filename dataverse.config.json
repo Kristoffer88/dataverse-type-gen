@@ -1,0 +1,18 @@
+{
+  "outputDir": "./generated",
+  "fileExtension": ".ts",
+  "includeComments": true,
+  "includeMetadata": true,
+  "includeValidation": true,
+  "includeLookupValues": true,
+  "includeBindingTypes": true,
+  "entities": [
+    "// Add specific entity logical names here",
+    "// Example: \"account\", \"contact\", \"opportunity\""
+  ],
+  "publisher": "// Your publisher prefix (e.g., 'pum') - for filtering by naming convention",
+  "solution": "// Your solution name (e.g., 'MySolution') - for filtering by actual solution membership",
+  "typeGenerationOptions": {
+    "useExactTypes": true
+  }
+}
