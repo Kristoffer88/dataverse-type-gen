@@ -14,14 +14,6 @@ Generate TypeScript types from Microsoft Dataverse metadata with enterprise-grad
 
 ## Quick Start
 
-### Installation
-
-```bash
-npm install dataverse-type-gen
-# or
-pnpm add dataverse-type-gen
-```
-
 ### Basic Usage
 
 **CLI (Recommended):**
@@ -41,6 +33,14 @@ npx dataverse-type-gen generate --solution "My Solution"
 
 # Preview without creating files
 npx dataverse-type-gen generate --entities account --dry-run
+```
+
+### Installation
+
+```bash
+npm install dataverse-type-gen
+# or
+pnpm add dataverse-type-gen
 ```
 
 **Programmatic API:**
