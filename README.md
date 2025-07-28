@@ -2,6 +2,10 @@
 
 Generate TypeScript types from Microsoft Dataverse metadata with enterprise-grade CLI and programmatic API.
 
+> **⚠️ CAUTION: AI-Generated Code**
+> 
+> This project was developed using AI assistance (Claude Code). Users should evaluate the code thoroughly before production use.
+
 ## Features
 
 - 🚀 **Enterprise CLI**: Modern command-line interface with 2025 best practices
