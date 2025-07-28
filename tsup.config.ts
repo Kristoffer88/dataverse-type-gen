@@ -28,6 +28,7 @@ export default defineConfig([
     clean: false,
     treeshake: true,
     external: ['commander', '@azure/msal-node', '@azure/identity'],
+    noExternal: ['chalk'],
     outExtension() {
       return {
         js: '.cjs'
