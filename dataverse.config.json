@@ -1,0 +1,16 @@
+{
+  "outputDir": "./generated",
+  "fileExtension": ".ts",
+  "includeComments": true,
+  "includeMetadata": true,
+  "includeValidation": true,
+  "entities": ["pum_initiative", "pum_program", "pum_portfolio"],
+  "publisher": "pum",
+  "typeGeneration": {
+    "useExactTypes": true,
+    "generateHooks": true,
+    "includeComments": true,
+    "includeMetadata": true,
+    "includeValidation": true
+  }
+}
