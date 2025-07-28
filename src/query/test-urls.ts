@@ -22,12 +22,18 @@ configureDataverseUrls({
 
 // Configure authenticated fetch for hooks
 const authenticatedFetch = createAuthenticatedFetcher()
-configureFetch(authenticatedFetch as any)
+configureFetch(authenticatedFetch as (input: string | URL | Request, init?: RequestInit) => Promise<Response>)
 
 /**
  * Test the URL builders with the actual Initiative entity
  */
-export async function testUrlBuilders() {
+export async function testUrlBuilders(): Promise<{
+  basicUrl: string
+  filteredUrl: string
+  complexUrl: string
+  countUrl: string
+  singleUrl: string
+}> {
   console.log('🧪 Testing Dataverse URL Builders')
   
   // Test 1: Basic entity set URL
@@ -100,7 +106,7 @@ export async function testUrlBuilders() {
 /**
  * Test actual API calls (requires authentication)
  */
-export async function testApiCalls() {
+export async function testApiCalls(): Promise<{ value?: Array<Record<string, unknown>>; '@odata.count'?: number } | null> {
   console.log('🌐 Testing actual API calls')
   
   try {
@@ -115,7 +121,7 @@ export async function testApiCalls() {
     const response = await authenticatedFetch(url)
     
     if (response.ok) {
-      const data: any = await response.json()
+      const data = await response.json() as { value?: Array<Record<string, unknown>>; '@odata.count'?: number }
       console.log('✅ API call successful!')
       console.log(`📊 Retrieved ${data.value?.length || 0} initiatives`)
       
@@ -143,7 +149,7 @@ export async function testApiCalls() {
 /**
  * Test React Query hooks
  */
-export async function testReactQueryHooks() {
+export async function testReactQueryHooks(): Promise<ReturnType<typeof createEntityHooks<pum_Initiative>> | null> {
   console.log('⚛️  Testing React Query hooks creation')
   
   try {
@@ -169,7 +175,10 @@ export async function testReactQueryHooks() {
 /**
  * Run all tests
  */
-export async function runAllTests() {
+export async function runAllTests(): Promise<{
+  urls: Awaited<ReturnType<typeof testUrlBuilders>>
+  hooks: Awaited<ReturnType<typeof testReactQueryHooks>>
+}> {
   console.log('🚀 Starting Dataverse URL Builder Tests\n')
   
   // Test URL builders

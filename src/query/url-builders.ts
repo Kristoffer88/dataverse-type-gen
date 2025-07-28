@@ -7,10 +7,7 @@ import type {
   EntityMetadata, 
   ODataQueryOptions, 
   ODataFilter, 
-  UrlBuilderOptions,
-  ODataSelect,
-  ODataExpand,
-  ODataOrderBy
+  UrlBuilderOptions
 } from './types.js'
 
 /**
@@ -272,7 +269,7 @@ function buildFilterExpression<TEntity>(filter: ODataFilter<TEntity>): string {
 /**
  * Build expression for a single field with operators
  */
-function buildFieldExpression(fieldName: string, operators: any): string {
+function buildFieldExpression(fieldName: string, operators: Record<string, unknown>): string {
   const expressions: string[] = []
   
   for (const [operator, value] of Object.entries(operators)) {
@@ -389,14 +386,14 @@ function buildFieldExpression(fieldName: string, operators: any): string {
 /**
  * Build direct comparison (field: value)
  */
-function buildDirectComparison(fieldName: string, value: any): string {
+function buildDirectComparison(fieldName: string, value: unknown): string {
   return `${fieldName} eq ${formatValue(value)}`
 }
 
 /**
  * Format value for OData query
  */
-function formatValue(value: any): string {
+function formatValue(value: unknown): string {
   if (value === null || value === undefined) {
     return 'null'
   }

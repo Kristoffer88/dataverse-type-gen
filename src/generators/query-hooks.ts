@@ -4,8 +4,7 @@
  */
 
 import type { 
-  ProcessedEntityMetadata,
-  ProcessedOptionSet
+  ProcessedEntityMetadata
 } from '../processors/index.js'
 
 import type { TypeGenerationOptions } from './index.js'
@@ -26,12 +25,12 @@ export function generateEntityHooks(
   // Import statements
   lines.push(`import { createEntityHooks } from 'dataverse-type-gen'`)
   lines.push(`import type { ODataFilter, UseEntityOptions, UseEntityListOptions } from 'dataverse-type-gen'`)
-  lines.push(`import { ${interfaceName}Metadata } from './${entityMetadata.logicalName}.js'`)
-  lines.push(`import type { ${interfaceName} } from './${entityMetadata.logicalName}.js'`)
+  lines.push(`import { ${interfaceName}Metadata } from '../${entityMetadata.logicalName}.js'`)
+  lines.push(`import type { ${interfaceName} } from '../${entityMetadata.logicalName}.js'`)
   
   // Import binding types if they exist
   const pascalTypeName = toPascalCaseTypeName(entityMetadata.schemaName)
-  lines.push(`import type { ${pascalTypeName}Create, ${pascalTypeName}Update } from './${entityMetadata.logicalName}.js'`)
+  lines.push(`import type { ${pascalTypeName}Create, ${pascalTypeName}Update } from '../${entityMetadata.logicalName}.js'`)
   
   lines.push('')
   
@@ -63,10 +62,10 @@ export function generateEntityHooks(
   
   // Add convenience exports with better names
   lines.push(`// Convenience exports with entity-specific names`)
-  lines.push(`export const use${interfaceName} = ${hooksName}.useEntity`)
-  lines.push(`export const use${interfaceName}List = ${hooksName}.useEntityList`)
-  lines.push(`export const use${interfaceName}Count = ${hooksName}.useEntityCount`)
-  lines.push(`export const use${interfaceName}Related = ${hooksName}.useRelatedEntities`)
+  lines.push(`export const useEntity = ${hooksName}.useEntity`)
+  lines.push(`export const useEntityList = ${hooksName}.useEntityList`)
+  lines.push(`export const useEntityCount = ${hooksName}.useEntityCount`)
+  lines.push(`export const useRelatedEntities = ${hooksName}.useRelatedEntities`)
   
   lines.push('')
   
@@ -79,37 +78,8 @@ export function generateEntityHooks(
   
   lines.push(`export type ${interfaceName}Filters = ODataFilter<${interfaceName}>`)
   
-  // Add specific filter helpers for option sets
-  const optionSetAttributes = entityMetadata.attributes.filter(attr => 
-    attr.attributeType === 'Picklist' || 
-    attr.attributeType === 'State' || 
-    attr.attributeType === 'Status'
-  )
-  
-  if (optionSetAttributes.length > 0) {
-    lines.push('')
-    if (includeComments) {
-      lines.push(`/**`)
-      lines.push(` * Helper filters for option set fields`)
-      lines.push(` */`)
-    }
-    lines.push(`export const ${interfaceName}FilterHelpers = {`)
-    
-    for (const attr of optionSetAttributes) {
-      if (attr.optionSetName) {
-        const constantName = generateOptionSetConstantName(attr.optionSetName)
-        const helperName = attr.logicalName.replace(/^pum_/, '')
-        
-        lines.push(`  /** Filter by ${attr.displayName} */`)
-        lines.push(`  ${helperName}: {`)
-        lines.push(`    active: { ${attr.logicalName}: ${constantName}.Active?.Value } as ${interfaceName}Filters,`)
-        lines.push(`    inactive: { ${attr.logicalName}: ${constantName}.Inactive?.Value } as ${interfaceName}Filters,`)
-        lines.push(`  },`)
-      }
-    }
-    
-    lines.push(`} as const`)
-  }
+  // Note: Option set helper filters are disabled to avoid import issues
+  // TODO: Add proper imports for option set constants before generating helpers
   
   lines.push('')
   
@@ -202,8 +172,7 @@ export function generateHooksIndex(
  * Generate usage documentation for the hooks
  */
 export function generateHooksDocumentation(
-  entities: ProcessedEntityMetadata[],
-  options: TypeGenerationOptions = {}
+  entities: ProcessedEntityMetadata[]
 ): string {
   const lines: string[] = []
   

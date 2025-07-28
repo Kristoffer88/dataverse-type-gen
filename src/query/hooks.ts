@@ -31,7 +31,7 @@ export interface UseQueryResult<TData = unknown, TError = unknown> {
   isFetching: boolean
   refetch: () => void
   // Additional properties may vary by React Query version
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export interface UseQueryOptions<TData = unknown, TError = unknown> {
@@ -43,11 +43,11 @@ export interface UseQueryOptions<TData = unknown, TError = unknown> {
   retry?: boolean | number
   onSuccess?: (data: TData) => void
   onError?: (error: TError) => void
-  select?: (data: any) => TData
-  queryKey?: any[]
+  select?: (data: unknown) => TData
+  queryKey?: unknown[]
   queryFn?: () => Promise<TData>
   // Additional properties may vary by React Query version
-  [key: string]: any
+  [key: string]: unknown
 }
 
 // Global configuration for fetch function
@@ -75,9 +75,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
     
     const error = new Error(errorData?.error?.message || `HTTP ${response.status}: ${response.statusText}`)
-    ;(error as any).code = errorData?.error?.code
-    ;(error as any).status = response.status
-    ;(error as any).details = errorData
+    ;(error as Error & { code?: string; status?: number; details?: DataverseError }).code = errorData?.error?.code
+    ;(error as Error & { code?: string; status?: number; details?: DataverseError }).status = response.status
+    ;(error as Error & { code?: string; status?: number; details?: DataverseError }).details = errorData
     
     throw error
   }
@@ -89,11 +89,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
  * Create entity-specific hooks for a given entity type
  */
 export function createEntityHooks<
-  TEntity = any,
-  TCreateInput = any,
-  TUpdateInput = any,
-  TBindings = any
->(metadata: EntityMetadata) {
+  TEntity = Record<string, unknown>
+>(metadata: EntityMetadata): {
+  useEntity: (id: string | undefined, options?: UseEntityOptions<TEntity> & UseQueryOptions<TEntity, Error>) => UseQueryResult<TEntity, Error>
+  useEntityList: (filters?: ODataFilter<TEntity>, options?: UseEntityListOptions<TEntity> & UseQueryOptions<ODataResponse<TEntity>, Error>) => UseQueryResult<ODataResponse<TEntity>, Error>
+  useEntityCount: (filters?: ODataFilter<TEntity>, options?: UseQueryOptions<number, Error>) => UseQueryResult<number, Error>
+  useRelatedEntities: <TRelated = Record<string, unknown>>(id: string | undefined, relationshipName: string, filters?: ODataFilter<TRelated>, options?: UseEntityListOptions<TRelated> & UseQueryOptions<ODataResponse<TRelated>, Error>) => UseQueryResult<ODataResponse<TRelated>, Error>
+  metadata: EntityMetadata
+} {
   
   /**
    * Hook for fetching a single entity by ID
@@ -189,7 +192,7 @@ export function createEntityHooks<
   /**
    * Hook for fetching related entities
    */
-  function useRelatedEntities<TRelated = any>(
+  function useRelatedEntities<TRelated = Record<string, unknown>>(
     id: string | undefined,
     relationshipName: string,
     filters?: ODataFilter<TRelated>,
@@ -239,10 +242,11 @@ export function createEntityHooks<
  * Get the appropriate useQuery hook from the available React Query version
  * This function detects and uses the correct useQuery from the environment
  */
-function getUseQuery(): any {
-  // Try to import useQuery from different React Query versions
+function getUseQuery(): <TData = unknown, TError = unknown>(options: UseQueryOptions<TData, TError>) => UseQueryResult<TData, TError> {
+  // Try to detect useQuery from different React Query versions
   try {
-    // Try @tanstack/react-query (v4+)
+    // Try @tanstack/react-query (v4+) - use dynamic require for compatibility
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const tanstackQuery = require('@tanstack/react-query')
     if (tanstackQuery?.useQuery) {
       return tanstackQuery.useQuery
@@ -252,7 +256,8 @@ function getUseQuery(): any {
   }
   
   try {
-    // Try react-query (v3)
+    // Try react-query (v3) - use dynamic require for compatibility
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const reactQuery = require('react-query')
     if (reactQuery?.useQuery) {
       return reactQuery.useQuery
@@ -273,9 +278,10 @@ function getUseQuery(): any {
 /**
  * Create a typed query client helper
  */
-export function createQueryClient() {
+export function createQueryClient(): unknown {
   try {
-    // Try @tanstack/react-query first
+    // Try @tanstack/react-query first - use dynamic require for compatibility
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const tanstackQuery = require('@tanstack/react-query')
     if (tanstackQuery?.QueryClient) {
       return new tanstackQuery.QueryClient({
@@ -284,9 +290,9 @@ export function createQueryClient() {
             staleTime: 1000 * 60 * 5, // 5 minutes
             cacheTime: 1000 * 60 * 30, // 30 minutes
             refetchOnWindowFocus: false,
-            retry: (failureCount: number, error: any) => {
+            retry: (failureCount: number, error: Error & { status?: number }): boolean => {
               // Don't retry on 4xx errors
-              if (error?.status >= 400 && error?.status < 500) {
+              if (error?.status && error.status >= 400 && error.status < 500) {
                 return false
               }
               return failureCount < 3
@@ -300,7 +306,8 @@ export function createQueryClient() {
   }
   
   try {
-    // Try react-query (v3)
+    // Try react-query (v3) - use dynamic require for compatibility
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const reactQuery = require('react-query')
     if (reactQuery?.QueryClient) {
       return new reactQuery.QueryClient({
@@ -309,9 +316,9 @@ export function createQueryClient() {
             staleTime: 1000 * 60 * 5, // 5 minutes
             cacheTime: 1000 * 60 * 30, // 30 minutes
             refetchOnWindowFocus: false,
-            retry: (failureCount: number, error: any) => {
+            retry: (failureCount: number, error: Error & { status?: number }): boolean => {
               // Don't retry on 4xx errors
-              if (error?.status >= 400 && error?.status < 500) {
+              if (error?.status && error.status >= 400 && error.status < 500) {
                 return false
               }
               return failureCount < 3
@@ -331,7 +338,7 @@ export function createQueryClient() {
  * Utility function to invalidate entity queries
  */
 export function invalidateEntityQueries<TEntity>(
-  queryClient: any,
+  queryClient: { invalidateQueries: (queryKey: (string | object)[]) => Promise<void> },
   entityName: string,
   options?: {
     operation?: 'single' | 'list' | 'count' | 'related'
@@ -357,11 +364,14 @@ export function invalidateEntityQueries<TEntity>(
  * Create a prefetch function for entities
  */
 export function createPrefetchFunction<TEntity>(
-  queryClient: any,
+  queryClient: { prefetchQuery: (options: { queryKey: unknown[]; queryFn: () => Promise<unknown> }) => Promise<void> },
   metadata: EntityMetadata
-) {
+): {
+  prefetchEntity: (id: string, options?: UseEntityOptions<TEntity>) => Promise<void>
+  prefetchEntityList: (filters?: ODataFilter<TEntity>, options?: UseEntityListOptions<TEntity>) => Promise<void>
+} {
   return {
-    prefetchEntity: (id: string, options?: UseEntityOptions<TEntity>) => {
+    prefetchEntity: (id: string, options?: UseEntityOptions<TEntity>): Promise<void> => {
       return queryClient.prefetchQuery({
         queryKey: createQueryKey<TEntity>(metadata.logicalName, 'single', { id }),
         queryFn: async () => {
@@ -372,7 +382,7 @@ export function createPrefetchFunction<TEntity>(
       })
     },
     
-    prefetchEntityList: (filters?: ODataFilter<TEntity>, options?: UseEntityListOptions<TEntity>) => {
+    prefetchEntityList: (filters?: ODataFilter<TEntity>, options?: UseEntityListOptions<TEntity>): Promise<void> => {
       return queryClient.prefetchQuery({
         queryKey: createQueryKey<TEntity>(metadata.logicalName, 'list', { filters }),
         queryFn: async () => {

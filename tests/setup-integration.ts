@@ -51,5 +51,14 @@ export function validateIntegrationEnvironment(): void {
   console.log(`   Authentication: Azure Identity (automatic)`)
 }
 
+/**
+ * Setup function that tests can call to ensure environment is ready
+ */
+export async function setupDataverse(): Promise<void> {
+  // Environment is already validated when this module is imported
+  // This function exists for backward compatibility with tests
+  return Promise.resolve()
+}
+
 // Auto-validate when this module is imported
 validateIntegrationEnvironment()

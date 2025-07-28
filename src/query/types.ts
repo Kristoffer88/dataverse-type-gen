@@ -106,7 +106,7 @@ export type ODataExpand<TEntity> = {
   [K in keyof TEntity]?: TEntity[K] extends string ? 
     K extends `${string}id` | `_${string}_value` ? {
       $select?: string[]
-      $filter?: Record<string, any>
+      $filter?: Record<string, unknown>
       $orderby?: string[]
       $top?: number
     } : never : 
@@ -193,11 +193,11 @@ export interface UseEntityListOptions<TEntity> extends ODataQueryOptions<TEntity
 }
 
 // Mutation types for create/update operations
-export type EntityCreateInput<TEntity, TBindings = {}> = 
+export type EntityCreateInput<TEntity, TBindings = Record<string, never>> = 
   Partial<Omit<TEntity, string & keyof { [K in keyof TEntity]: TEntity[K] extends string ? K extends `${string}id` ? K : never : never }>> & 
   Partial<TBindings>
 
-export type EntityUpdateInput<TEntity, TBindings = {}> = 
+export type EntityUpdateInput<TEntity, TBindings = Record<string, never>> = 
   Partial<Omit<TEntity, string & keyof { [K in keyof TEntity]: TEntity[K] extends string ? K extends `${string}id` ? K : never : never }>> & 
   Partial<TBindings> &
   { [K in keyof TEntity]: K extends `${string}id` ? TEntity[K] : never }[keyof TEntity]
@@ -225,4 +225,11 @@ export interface DataverseError {
       stacktrace?: string
     }
   }
+}
+
+// Configuration for Dataverse URLs
+export interface DataverseUrlConfig {
+  baseUrl?: string
+  apiVersion?: string
+  instanceUrl?: string
 }

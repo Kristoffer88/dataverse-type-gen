@@ -6,7 +6,8 @@
 import type { 
   EntityMetadata, 
   ODataFilter, 
-  ODataQueryOptions 
+  ODataQueryOptions,
+  DataverseUrlConfig
 } from './types.js'
 
 import { 
@@ -17,14 +18,6 @@ import {
   buildUrl
 } from './url-builders.js'
 
-/**
- * Configuration for Dataverse URLs
- */
-export interface DataverseUrlConfig {
-  baseUrl?: string
-  apiVersion?: string
-  instanceUrl?: string
-}
 
 /**
  * Default configuration
@@ -133,7 +126,7 @@ export const DataverseUrls = {
    *   $orderby: { pum_duedate: 'asc' }
    * })
    */
-  related<TEntity, TRelated>(
+  related<TRelated = Record<string, unknown>>(
     metadata: EntityMetadata,
     id: string,
     relationshipName: string,
@@ -226,7 +219,7 @@ export const DataverseHelpers = {
    */
   customApi(
     apiName: string,
-    parameters?: Record<string, any>,
+    parameters?: Record<string, unknown>,
     config?: DataverseUrlConfig
   ): string {
     const urlConfig = { ...defaultConfig, ...config }
@@ -269,7 +262,7 @@ export const DataverseHelpers = {
    */
   function(
     functionName: string,
-    parameters?: Record<string, any>,
+    parameters?: Record<string, unknown>,
     config?: DataverseUrlConfig
   ): string {
     const urlConfig = { ...defaultConfig, ...config }
