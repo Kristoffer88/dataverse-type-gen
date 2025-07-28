@@ -11,7 +11,7 @@ export default defineConfig([
     outDir: 'dist',
     clean: true,
     treeshake: true,
-    external: ['commander', 'chalk', '@azure/msal-node', '@azure/identity'],
+    external: ['commander', '@azure/msal-node', '@azure/identity'],
     outExtension({ format }) {
       return {
         js: format === 'esm' ? '.mjs' : '.js'
@@ -27,7 +27,8 @@ export default defineConfig([
     outDir: 'dist',
     clean: false,
     treeshake: true,
-    external: ['commander', 'chalk', '@azure/msal-node', '@azure/identity'],
+    external: ['commander', '@azure/msal-node', '@azure/identity'],
+    noExternal: ['chalk'],
     outExtension() {
       return {
         js: '.cjs'
