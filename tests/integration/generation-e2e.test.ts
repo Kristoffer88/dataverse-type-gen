@@ -66,9 +66,9 @@ describe('Full Generation Pipeline Integration Tests', () => {
         // Check utility types (now empty since Create/Update types are removed)
         expect(generatedCode.types).toBe('')
         
-        // Check metadata object
-        expect(generatedCode.metadata).toContain('AccountMetadata')
-        expect(generatedCode.metadata).toContain('logicalName: "account"')
+        // Check metadata object (interfaces now includes metadata)
+        expect(generatedCode.interfaces).toContain('AccountMetadata')
+        expect(generatedCode.interfaces).toContain('logicalName: "account"')
         
         console.log('✅ Generated complete TypeScript definitions for account entity')
         

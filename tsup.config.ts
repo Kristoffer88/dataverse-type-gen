@@ -20,7 +20,7 @@ export default defineConfig([
   },
   // CLI build (CommonJS only for executable)
   {
-    entry: { 'cli/index': 'src/cli/index.ts' },
+    entry: { 'bin/cli': 'src/bin/cli.ts' },
     format: ['cjs'],
     sourcemap: true,
     target: 'es2022',

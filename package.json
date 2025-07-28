@@ -1,6 +1,6 @@
 {
     "name": "dataverse-type-gen",
-    "version": "1.1.3",
+    "version": "1.1.4",
     "description": "TypeScript type generator for Dataverse entities and metadata",
     "type": "module",
     "main": "dist/index.js",
@@ -14,7 +14,7 @@
         }
     },
     "bin": {
-        "dataverse-type-gen": "dist/cli/index.cjs"
+        "dataverse-type-gen": "dist/bin/cli.cjs"
     },
     "scripts": {
         "build": "pnpm check-types && tsup",

@@ -797,11 +797,7 @@ Examples:
   return program
 }
 
-/**
- * Run CLI if this file is executed directly
- */
-// Always run the CLI when this module is loaded as the main entry point
-const program = setupCLI()
-program.parse()
+// CLI setup is now handled by src/bin/cli.ts
+// This file only exports the CLI functions for testing and reuse
 
 export { generateCommand, initCommand, validateCommand, SimpleLogger }
