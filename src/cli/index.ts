@@ -800,9 +800,8 @@ Examples:
 /**
  * Run CLI if this file is executed directly
  */
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const program = setupCLI()
-  program.parse()
-}
+// Always run the CLI when this module is loaded as the main entry point
+const program = setupCLI()
+program.parse()
 
 export { generateCommand, initCommand, validateCommand, SimpleLogger }
