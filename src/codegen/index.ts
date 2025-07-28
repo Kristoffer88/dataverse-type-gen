@@ -1,5 +1,5 @@
 import { promises as fs } from 'fs'
-import { join, dirname } from 'path'
+import { join, dirname, relative } from 'path'
 import { Project, ScriptTarget, ModuleKind } from 'ts-morph'
 import type { GeneratedCode, TypeGenerationOptions } from '../generators/index.js'
 import { generateEntityFile, generateImports, generateGlobalOptionSetFile } from '../generators/index.js'
@@ -353,8 +353,10 @@ async function generateIndexFile(
 
     // Add exports for each successful file
     for (const file of successfulFiles) {
-      const fileName = file.filePath.split('/').pop()?.replace(/\.(ts|d\.ts)$/, '') || 'unknown'
-      lines.push(`export * from './${fileName}.js'`)
+      // Get relative path from output directory
+      const relativePath = relative(config.outputDir, file.filePath)
+      const exportPath = relativePath.replace(/\.(ts|d\.ts)$/, '.js')
+      lines.push(`export * from './${exportPath}'`)
     }
 
     const content = lines.join('\n') + '\n'

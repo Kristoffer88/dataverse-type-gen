@@ -487,6 +487,7 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
       fileExtension: config.fileExtension,
       indexFile: true,
       overwrite: config.overwrite,
+      generateHooks: (config as { typeGeneration?: { generateHooks?: boolean } }).typeGeneration?.generateHooks ?? false,
       typeGenerationOptions: {
         includeComments: config.includeComments,
         includeMetadata: config.includeMetadata,

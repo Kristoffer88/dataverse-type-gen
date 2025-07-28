@@ -10,7 +10,8 @@ import type {
 import type { TypeGenerationOptions } from './index.js'
 
 /**
- * Generate React Query hooks for an entity
+ * Generate individual, composable React Query hooks for an entity
+ * Each hook is standalone and can be easily customized by developers
  */
 export function generateEntityHooks(
   entityMetadata: ProcessedEntityMetadata,
@@ -20,87 +21,282 @@ export function generateEntityHooks(
   const lines: string[] = []
   
   const interfaceName = entityMetadata.schemaName
-  const hooksName = `use${interfaceName}`
+  const pascalTypeName = toPascalCaseTypeName(entityMetadata.schemaName)
+  const entitySetName = entityMetadata.entitySetName
+  const primaryKey = entityMetadata.primaryIdAttribute
   
   // Import statements
-  lines.push(`import { createEntityHooks } from 'dataverse-type-gen'`)
-  lines.push(`import type { ODataFilter, UseEntityOptions, UseEntityListOptions } from 'dataverse-type-gen'`)
+  lines.push(`import { useQuery } from '@tanstack/react-query'`)
+  lines.push(`import type { UseQueryOptions, UseQueryResult } from '@tanstack/react-query'`)
   lines.push(`import { ${interfaceName}Metadata } from '../${entityMetadata.logicalName}.js'`)
   lines.push(`import type { ${interfaceName} } from '../${entityMetadata.logicalName}.js'`)
   
-  // Import binding types if they exist
-  const pascalTypeName = toPascalCaseTypeName(entityMetadata.schemaName)
-  lines.push(`import type { ${pascalTypeName}Create, ${pascalTypeName}Update } from '../${entityMetadata.logicalName}.js'`)
+  // Import option set constants for examples
+  const stateAttribute = entityMetadata.attributes.find(attr => attr.logicalName === 'statecode')
+  if (stateAttribute?.optionSetName) {
+    const stateConstantName = generateOptionSetConstantName(stateAttribute.optionSetName)
+    lines.push(`import { ${stateConstantName} } from '../${entityMetadata.logicalName}.js'`)
+  }
   
   lines.push('')
   
-  // Add hooks comment
+  // Add type definitions
+  lines.push(`// Global fetch function - configure this with your authenticated fetch`)
+  lines.push(`let globalFetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response> = fetch`)
+  lines.push(``)
+  lines.push(`export function configureFetch(fetchFn: typeof fetch): void {`)
+  lines.push(`  globalFetch = fetchFn`)
+  lines.push(`}`)
+  lines.push(``)
+  
+  // Add OData types
+  lines.push(`type ODataResponse<T> = {`)
+  lines.push(`  value: T[]`)
+  lines.push(`  '@odata.count'?: number`)
+  lines.push(`  '@odata.nextLink'?: string`)
+  lines.push(`}`)
+  lines.push(``)
+  
+  lines.push(`type ODataFilter<T> = {`)
+  lines.push(`  [K in keyof T]?: T[K] | { $eq?: T[K]; $ne?: T[K]; $contains?: string; $startswith?: string; $gt?: T[K]; $lt?: T[K] }`)
+  lines.push(`} & {`)
+  lines.push(`  $and?: ODataFilter<T>[]`)
+  lines.push(`  $or?: ODataFilter<T>[]`)
+  lines.push(`}`)
+  lines.push(``)
+  
+  lines.push(`type EntityOptions = {`)
+  lines.push(`  $select?: string[]`)
+  lines.push(`  $expand?: string[]`)
+  lines.push(`}`)
+  lines.push(``)
+  
+  lines.push(`type EntityListOptions<T> = EntityOptions & {`)
+  lines.push(`  $filter?: ODataFilter<T>`)
+  lines.push(`  $orderby?: { [K in keyof T]?: 'asc' | 'desc' }`)
+  lines.push(`  $top?: number`)
+  lines.push(`  $skip?: number`)
+  lines.push(`}`)
+  lines.push(``)
+  
+  // Helper function to build URLs
+  lines.push(`function buildODataUrl(entitySet: string, options?: EntityListOptions<any>, id?: string): string {`)
+  lines.push(`  const baseUrl = \`/api/data/v9.2/\${entitySet}\``)
+  lines.push(`  const url = id ? \`\${baseUrl}(\${id})\` : baseUrl`)
+  lines.push(`  const params = new URLSearchParams()`)
+  lines.push(`  `)
+  lines.push(`  if (options?.$select) params.append('$select', options.$select.join(','))`)
+  lines.push(`  if (options?.$expand) params.append('$expand', options.$expand.join(','))`)
+  lines.push(`  if (options?.$top) params.append('$top', options.$top.toString())`)
+  lines.push(`  if (options?.$skip) params.append('$skip', options.$skip.toString())`)
+  lines.push(`  `)
+  lines.push(`  // Simple filter implementation - extend as needed`)
+  lines.push(`  if (options?.$filter) {`)
+  lines.push(`    const filters: string[] = []`)
+  lines.push(`    Object.entries(options.$filter).forEach(([key, value]) => {`)
+  lines.push(`      if (key.startsWith('$')) return // Skip logical operators for now`)
+  lines.push(`      if (typeof value === 'object' && value !== null) {`)
+  lines.push(`        Object.entries(value).forEach(([op, val]) => {`)
+  lines.push(`          if (op === '$eq') filters.push(\`\${key} eq \${typeof val === 'string' ? \`'\${val}'\` : val}\`)`)
+  lines.push(`          if (op === '$contains') filters.push(\`contains(\${key}, '\${val}')\`)`)
+  lines.push(`        })`)
+  lines.push(`      } else {`)
+  lines.push(`        filters.push(\`\${key} eq \${typeof value === 'string' ? \`'\${value}'\` : value}\`)`)
+  lines.push(`      }`)
+  lines.push(`    })`)
+  lines.push(`    if (filters.length > 0) params.append('$filter', filters.join(' and '))`)
+  lines.push(`  }`)
+  lines.push(`  `)
+  lines.push(`  if (options?.$orderby) {`)
+  lines.push(`    const orderby = Object.entries(options.$orderby)`)
+  lines.push(`      .map(([field, direction]) => \`\${field} \${direction}\`)`)
+  lines.push(`      .join(', ')`)
+  lines.push(`    params.append('$orderby', orderby)`)
+  lines.push(`  }`)
+  lines.push(`  `)
+  lines.push(`  return params.toString() ? \`\${url}?\${params}\` : url`)
+  lines.push(`}`)
+  lines.push(``)
+  
+  // Generate individual hooks
+  generateSingleEntityHook(lines, interfaceName, pascalTypeName, entitySetName, primaryKey, entityMetadata, includeComments)
+  lines.push('')
+  
+  generateEntityListHook(lines, interfaceName, pascalTypeName, entitySetName, entityMetadata, includeComments)
+  lines.push('')
+  
+  generateEntityCountHook(lines, interfaceName, pascalTypeName, entitySetName, entityMetadata, includeComments)
+  lines.push('')
+  
+  // Add query keys
   if (includeComments) {
     lines.push(`/**`)
-    lines.push(` * React Query hooks for ${entityMetadata.displayName}`)
-    lines.push(` * Provides type-safe data fetching with caching and synchronization`)
+    lines.push(` * Query keys for cache management`)
+    lines.push(` * Use these to invalidate or prefetch specific queries`)
+    lines.push(` */`)
+  }
+  lines.push(`export const ${pascalTypeName}QueryKeys = {`)
+  lines.push(`  all: ['${entityMetadata.logicalName}'] as const,`)
+  lines.push(`  detail: (id: string) => [...${pascalTypeName}QueryKeys.all, 'detail', id] as const,`)
+  lines.push(`  list: (options?: EntityListOptions<${interfaceName}>) => [...${pascalTypeName}QueryKeys.all, 'list', options] as const,`)
+  lines.push(`  count: (options?: EntityListOptions<${interfaceName}>) => [...${pascalTypeName}QueryKeys.all, 'count', options] as const,`)
+  lines.push(`}`)
+  
+  return lines.join('\n')
+}
+
+/**
+ * Generate hook for fetching a single entity
+ */
+function generateSingleEntityHook(
+  lines: string[],
+  interfaceName: string,
+  pascalTypeName: string,
+  entitySetName: string,
+  primaryKey: string,
+  entityMetadata: ProcessedEntityMetadata,
+  includeComments: boolean
+): void {
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Hook for fetching a single ${entityMetadata.displayName}`)
+    lines.push(` * `)
+    lines.push(` * @param id - The ${primaryKey} of the entity`)
+    lines.push(` * @param options - Query options including $select, $expand, and React Query options`)
     lines.push(` * `)
     lines.push(` * @example`)
-    lines.push(` * // Fetch single entity`)
-    lines.push(` * const { data: entity } = ${hooksName}.useEntity('${generateSampleGuid()}')`)
+    lines.push(` * const { data: initiative, isLoading, error } = use${pascalTypeName}(`)
+    lines.push(` *   '123e4567-e89b-12d3-a456-426614174000',`)
+    lines.push(` *   { $select: ['${entityMetadata.primaryNameAttribute}', '${entityMetadata.attributes[0]?.logicalName || 'field'}'] }`)
+    lines.push(` * )`)
+    lines.push(` */`)
+  }
+  
+  lines.push(`export function use${pascalTypeName}(`)
+  lines.push(`  id: string | undefined,`)
+  lines.push(`  options: EntityOptions & Omit<UseQueryOptions<${interfaceName}>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`): UseQueryResult<${interfaceName}> {`)
+  lines.push(`  const { $select, $expand, ...queryOptions } = options`)
+  lines.push(`  `)
+  lines.push(`  return useQuery({`)
+  lines.push(`    queryKey: ${pascalTypeName}QueryKeys.detail(id || ''),`)
+  lines.push(`    queryFn: async (): Promise<${interfaceName}> => {`)
+  lines.push(`      if (!id) throw new Error('ID is required')`)
+  lines.push(`      `)
+  lines.push(`      const url = buildODataUrl('${entitySetName}', { $select, $expand }, id)`)
+  lines.push(`      const response = await globalFetch(url)`)
+  lines.push(`      `)
+  lines.push(`      if (!response.ok) {`)
+  lines.push(`        throw new Error(\`Failed to fetch ${entityMetadata.displayName}: \${response.statusText}\`)`)
+  lines.push(`      }`)
+  lines.push(`      `)
+  lines.push(`      return response.json()`)
+  lines.push(`    },`)
+  lines.push(`    enabled: !!id,`)
+  lines.push(`    ...queryOptions`)
+  lines.push(`  })`)
+  lines.push(`}`)
+}
+
+/**
+ * Generate hook for fetching a list of entities
+ */
+function generateEntityListHook(
+  lines: string[],
+  interfaceName: string,
+  pascalTypeName: string,
+  entitySetName: string,
+  entityMetadata: ProcessedEntityMetadata,
+  includeComments: boolean
+): void {
+  if (includeComments) {
+    const stateAttribute = entityMetadata.attributes.find(attr => attr.logicalName === 'statecode')
+    const stateExample = stateAttribute?.optionSetName 
+      ? `${generateOptionSetConstantName(stateAttribute.optionSetName)}.Active.Value`
+      : '0'
+    
+    lines.push(`/**`)
+    lines.push(` * Hook for fetching a list of ${entityMetadata.displayName} entities`)
     lines.push(` * `)
-    lines.push(` * // Fetch entity list with filters`)
-    lines.push(` * const { data: entities } = ${hooksName}.useEntityList({`)
-    lines.push(` *   statecode: ${getFirstOptionSetExample(entityMetadata)}`)
+    lines.push(` * @param options - Query options including filters, select, expand, orderby, etc.`)
+    lines.push(` * `)
+    lines.push(` * @example`)
+    lines.push(` * const { data: initiatives } = use${pascalTypeName}List({`)
+    lines.push(` *   $filter: { statecode: ${stateExample} },`)
+    lines.push(` *   $select: ['${entityMetadata.primaryNameAttribute}', '${entityMetadata.attributes[0]?.logicalName || 'field'}'],`)
+    lines.push(` *   $orderby: { ${entityMetadata.primaryNameAttribute}: 'asc' },`)
+    lines.push(` *   $top: 10`)
     lines.push(` * })`)
     lines.push(` */`)
   }
   
-  // Create the hooks object
-  lines.push(`export const ${hooksName} = createEntityHooks<`)
-  lines.push(`  ${interfaceName},`)
-  lines.push(`  ${pascalTypeName}Create,`)
-  lines.push(`  ${pascalTypeName}Update`)
-  lines.push(`>(${interfaceName}Metadata)`)
-  
-  lines.push('')
-  
-  // Add convenience exports with better names
-  lines.push(`// Convenience exports with entity-specific names`)
-  lines.push(`export const useEntity = ${hooksName}.useEntity`)
-  lines.push(`export const useEntityList = ${hooksName}.useEntityList`)
-  lines.push(`export const useEntityCount = ${hooksName}.useEntityCount`)
-  lines.push(`export const useRelatedEntities = ${hooksName}.useRelatedEntities`)
-  
-  lines.push('')
-  
-  // Add TypeScript helper types for common filter patterns
-  if (includeComments) {
-    lines.push(`/**`)
-    lines.push(` * Common filter patterns for ${entityMetadata.displayName}`)
-    lines.push(` */`)
-  }
-  
-  lines.push(`export type ${interfaceName}Filters = ODataFilter<${interfaceName}>`)
-  
-  // Note: Option set helper filters are disabled to avoid import issues
-  // TODO: Add proper imports for option set constants before generating helpers
-  
-  lines.push('')
-  
-  // Add query key helpers
-  if (includeComments) {
-    lines.push(`/**`)
-    lines.push(` * Query key factory for ${entityMetadata.displayName}`)
-    lines.push(` * Use these keys for manual cache manipulation`)
-    lines.push(` */`)
-  }
-  lines.push(`export const ${interfaceName}QueryKeys = {`)
-  lines.push(`  all: ['dataverse', '${entityMetadata.logicalName}'] as const,`)
-  lines.push(`  lists: () => [...${interfaceName}QueryKeys.all, 'list'] as const,`)
-  lines.push(`  list: (filters?: ${interfaceName}Filters) => [...${interfaceName}QueryKeys.lists(), { filters }] as const,`)
-  lines.push(`  details: () => [...${interfaceName}QueryKeys.all, 'detail'] as const,`)
-  lines.push(`  detail: (id: string) => [...${interfaceName}QueryKeys.details(), id] as const,`)
-  lines.push(`  counts: () => [...${interfaceName}QueryKeys.all, 'count'] as const,`)
-  lines.push(`  count: (filters?: ${interfaceName}Filters) => [...${interfaceName}QueryKeys.counts(), { filters }] as const,`)
+  lines.push(`export function use${pascalTypeName}List(`)
+  lines.push(`  options: EntityListOptions<${interfaceName}> & Omit<UseQueryOptions<ODataResponse<${interfaceName}>>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`): UseQueryResult<ODataResponse<${interfaceName}>> {`)
+  lines.push(`  const { $filter, $select, $expand, $orderby, $top, $skip, ...queryOptions } = options`)
+  lines.push(`  `)
+  lines.push(`  return useQuery({`)
+  lines.push(`    queryKey: ${pascalTypeName}QueryKeys.list({ $filter, $select, $expand, $orderby, $top, $skip }),`)
+  lines.push(`    queryFn: async (): Promise<ODataResponse<${interfaceName}>> => {`)
+  lines.push(`      const url = buildODataUrl('${entitySetName}', { $filter, $select, $expand, $orderby, $top, $skip })`)
+  lines.push(`      const response = await globalFetch(url)`)
+  lines.push(`      `)
+  lines.push(`      if (!response.ok) {`)
+  lines.push(`        throw new Error(\`Failed to fetch ${entityMetadata.displayName} list: \${response.statusText}\`)`)
+  lines.push(`      }`)
+  lines.push(`      `)
+  lines.push(`      return response.json()`)
+  lines.push(`    },`)
+  lines.push(`    ...queryOptions`)
+  lines.push(`  })`)
   lines.push(`}`)
+}
+
+/**
+ * Generate hook for counting entities
+ */
+function generateEntityCountHook(
+  lines: string[],
+  interfaceName: string,
+  pascalTypeName: string,
+  entitySetName: string,
+  entityMetadata: ProcessedEntityMetadata,
+  includeComments: boolean
+): void {
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Hook for counting ${entityMetadata.displayName} entities`)
+    lines.push(` * `)
+    lines.push(` * @param options - Filter options to count specific entities`)
+    lines.push(` * `)
+    lines.push(` * @example`)
+    lines.push(` * const { data: count } = use${pascalTypeName}Count({`)
+    lines.push(` *   $filter: { statecode: 0 }`)
+    lines.push(` * })`)
+    lines.push(` */`)
+  }
   
-  return lines.join('\n')
+  lines.push(`export function use${pascalTypeName}Count(`)
+  lines.push(`  options: Pick<EntityListOptions<${interfaceName}>, '$filter'> & Omit<UseQueryOptions<number>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`): UseQueryResult<number> {`)
+  lines.push(`  const { $filter, ...queryOptions } = options`)
+  lines.push(`  `)
+  lines.push(`  return useQuery({`)
+  lines.push(`    queryKey: ${pascalTypeName}QueryKeys.count({ $filter }),`)
+  lines.push(`    queryFn: async (): Promise<number> => {`)
+  lines.push(`      const url = buildODataUrl('${entitySetName}', { $filter }) + ($filter ? '&' : '?') + '$count=true'`)
+  lines.push(`      const response = await globalFetch(url.replace('${entitySetName}', '${entitySetName}/$count'))`)
+  lines.push(`      `)
+  lines.push(`      if (!response.ok) {`)
+  lines.push(`        throw new Error(\`Failed to count ${entityMetadata.displayName}: \${response.statusText}\`)`)
+  lines.push(`      }`)
+  lines.push(`      `)
+  lines.push(`      const count = await response.text()`)
+  lines.push(`      return parseInt(count, 10)`)
+  lines.push(`    },`)
+  lines.push(`    ...queryOptions`)
+  lines.push(`  })`)
+  lines.push(`}`)
 }
 
 /**
