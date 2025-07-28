@@ -90,6 +90,8 @@ export async function generateEntityTypeScript(
       schemaName: string
       targets: string[]
     }>()
+    
+    const relationshipNames = new Set<string>()
 
     // Fetch detailed metadata for each type
     for (const attributeType of attributeTypes) {
@@ -160,6 +162,21 @@ export async function generateEntityTypeScript(
       } catch {
         // Continue if a specific attribute type fails
       }
+    }
+
+    // Fetch relationship metadata (one-to-many relationships where this entity is the referenced entity)
+    try {
+      const relationshipsUrl = `/api/data/v9.2/RelationshipDefinitions/Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata?$filter=ReferencedEntity eq '${entityName}'&$select=SchemaName`
+      const relationshipsRes = await fetch(relationshipsUrl)
+      
+      if (relationshipsRes.ok) {
+        const relationshipsData = await relationshipsRes.json() as { value: Array<{ SchemaName: string }> }
+        relationshipsData.value?.forEach(rel => {
+          relationshipNames.add(rel.SchemaName)
+        })
+      }
+    } catch {
+      // Continue if relationship fetching fails
     }
 
     // Generate TypeScript file content
@@ -350,6 +367,21 @@ export async function generateEntityTypeScript(
       })
       
       tsContent += `  },\n`
+      
+      // Add expandable properties (lookup fields + relationship names)
+      const expandableProps = [
+        ...Array.from(lookupFields.keys()),
+        ...Array.from(relationshipNames)
+      ]
+      
+      if (expandableProps.length > 0) {
+        tsContent += `  expandableProperties: [\n`
+        expandableProps.forEach(prop => {
+          const comment = lookupFields.has(prop) ? ' // Lookup field' : ' // Relationship'
+          tsContent += `    "${prop}",${comment}\n`
+        })
+        tsContent += `  ],\n`
+      }
       
       // Add lookup fields metadata when available
       if (lookupFields.size > 0) {

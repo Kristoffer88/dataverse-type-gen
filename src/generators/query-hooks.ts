@@ -35,14 +35,12 @@ export function generateEntityHooks(
   lines.push(`  ODataSelect,`)
   lines.push(`  ODataExpand,`)
   lines.push(`  ODataOrderBy,`)
-  lines.push(`  ODataQueryOptions,`)
   lines.push(`  ODataResponse,`)
-  lines.push(`  StringOperators,`)
-  lines.push(`  NumberOperators,`)
-  lines.push(`  BooleanOperators,`)
-  lines.push(`  DateOperators,`)
-  lines.push(`  LookupOperators`)
-  lines.push(`} from '../../src/query/types.js'`)
+  lines.push(`  EntityListOptions,`)
+  lines.push(`  EntityListOptionsWithMetadata,`)
+  lines.push(`  ExpandablePropertiesOf`)
+  lines.push(`} from 'dataverse-type-gen'`)
+  lines.push(`import { ${pascalTypeName}Queries } from '../queries/${entityMetadata.logicalName}.queries.js'`)
   
   // Import option set constants for examples
   const stateAttribute = entityMetadata.attributes.find(attr => attr.logicalName === 'statecode')
@@ -77,136 +75,31 @@ export function generateEntityHooks(
   lines.push(`}`)
   lines.push(``)
   
-  // =====================================================================
-  // Types
-  // =====================================================================
+  // Types are imported from dataverse-type-gen library
   
+  // Type-safe options using entity metadata
   if (includeComments) {
-    lines.push(`/** Options for single entity queries */`)
+    lines.push(`/** Options for single entity queries with type-safe expand */`)
   }
   lines.push(`type EntityOptions<T> = {`)
   lines.push(`  /** Select specific fields (provides IntelliSense) */`)
   lines.push(`  $select?: ODataSelect<T>`)
-  lines.push(`  /** Expand related entities */`)
-  lines.push(`  $expand?: ODataExpand<T>`)
+  lines.push(`  /** Expand related entities (type-safe to actual lookup fields and relationships) */`)
+  lines.push(`  $expand?: ExpandablePropertiesOf<typeof ${interfaceName}Metadata>`)
   lines.push(`}`)
   lines.push(``)
+  
+  // =====================================================================
+  // React Query Hooks (using generated query builders)
+  // =====================================================================
   
   if (includeComments) {
-    lines.push(`/** Options for entity list queries with filtering and pagination */`)
+    lines.push(`/**`)
+    lines.push(` * These hooks use the generated query builders from ${pascalTypeName}Queries.`)
+    lines.push(` * You can modify the query building logic by editing the queries file.`)
+    lines.push(` */`)
+    lines.push(``)
   }
-  lines.push(`type EntityListOptions<T> = EntityOptions<T> & {`)
-  lines.push(`  /** Filter entities (type-safe field names and operators) */`)
-  lines.push(`  $filter?: ODataFilter<T>`)
-  lines.push(`  /** Sort results by fields with direction */`)
-  lines.push(`  $orderby?: ODataOrderBy<T>`)
-  lines.push(`  /** Limit number of results */`)
-  lines.push(`  $top?: number`)
-  lines.push(`  /** Skip results for pagination */`)
-  lines.push(`  $skip?: number`)
-  lines.push(`}`)
-  lines.push(``)
-  
-  // =====================================================================
-  // Internal Utilities (Auto-generated - No need to modify)
-  // =====================================================================
-  
-  // Type-safe OData operators - ensures field names are valid entity properties
-  lines.push(`const odataOperators = {`)
-  lines.push(`  $eq: <T>(field: keyof T, value: any) => \`\${String(field)} eq \${formatValue(value)}\`,`)
-  lines.push(`  $ne: <T>(field: keyof T, value: any) => \`\${String(field)} ne \${formatValue(value)}\`,`)
-  lines.push(`  $gt: <T>(field: keyof T, value: any) => \`\${String(field)} gt \${formatValue(value)}\`,`)
-  lines.push(`  $lt: <T>(field: keyof T, value: any) => \`\${String(field)} lt \${formatValue(value)}\`,`)
-  lines.push(`  $gte: <T>(field: keyof T, value: any) => \`\${String(field)} ge \${formatValue(value)}\`,`)
-  lines.push(`  $lte: <T>(field: keyof T, value: any) => \`\${String(field)} le \${formatValue(value)}\`,`)
-  lines.push(`  $contains: <T>(field: keyof T, value: string) => \`contains(\${String(field)}, '\${value}')\`,`)
-  lines.push(`  $startswith: <T>(field: keyof T, value: string) => \`startswith(\${String(field)}, '\${value}')\`,`)
-  lines.push(`  $endswith: <T>(field: keyof T, value: string) => \`endswith(\${String(field)}, '\${value}')\`,`)
-  lines.push(`  $in: <T>(field: keyof T, values: any[]) => \`\${String(field)} in (\${values.map(formatValue).join(',')})\`,`)
-  lines.push(`} as const`)
-  lines.push(``)
-  // Value formatter for OData queries
-  lines.push(`const formatValue = (value: any): string => {`)
-  lines.push(`  if (value === null || value === undefined) return 'null'`)
-  lines.push(`  if (typeof value === 'string') return \`'\${value.replace(/'/g, "''")}\``)
-  lines.push(`  if (value instanceof Date) return \`'\${value.toISOString()}'\``)
-  lines.push(`  if (typeof value === 'boolean') return value.toString()`)
-  lines.push(`  return String(value)`)
-  lines.push(`}`)
-  lines.push(``)
-  
-  // Break complex functions into more readable chunks
-  lines.push(`// Build OData filter string with support for logical operators`)
-  lines.push(`const buildFilter = <T>(filter: ODataFilter<T>): string => {`)
-  lines.push(`  const conditions = Object.entries(filter)`)
-  lines.push(`    .filter(([key]) => !key.startsWith('$'))`)
-  lines.push(`    .map(([field, value]) => {`)
-  lines.push(`      if (typeof value === 'object' && value !== null && !(value instanceof Date)) {`)
-  lines.push(`        return Object.entries(value)`)
-  lines.push(`          .map(([op, val]) => {`)
-  lines.push(`            const operatorFn = odataOperators[op as keyof typeof odataOperators]`)
-  lines.push(`            return operatorFn ? operatorFn<T>(field as keyof T, val) : null`)
-  lines.push(`          })`)
-  lines.push(`          .filter(Boolean)`)
-  lines.push(`          .join(' and ')`)
-  lines.push(`      }`)
-  lines.push(`      return odataOperators.$eq<T>(field as keyof T, value)`)
-  lines.push(`    })`)
-  lines.push(`    .filter(Boolean)`)
-  lines.push(``)
-  lines.push(`  // Handle $and and $or logical operators`)
-  lines.push(`  const logicalConditions: string[] = []`)
-  lines.push(`  if ('$and' in filter && filter.$and) {`)
-  lines.push(`    const andConditions = filter.$and.map(f => buildFilter<T>(f)).filter(Boolean)`)
-  lines.push(`    if (andConditions.length > 0) {`)
-  lines.push(`      logicalConditions.push(\`(\${andConditions.join(' and ')})\`)`)
-  lines.push(`    }`)
-  lines.push(`  }`)
-  lines.push(`  if ('$or' in filter && filter.$or) {`)
-  lines.push(`    const orConditions = filter.$or.map(f => buildFilter<T>(f)).filter(Boolean)`)
-  lines.push(`    if (orConditions.length > 0) {`)
-  lines.push(`      logicalConditions.push(\`(\${orConditions.join(' or ')})\`)`)
-  lines.push(`    }`)
-  lines.push(`  }`)
-  lines.push(``)
-  lines.push(`  const allConditions = [...conditions, ...logicalConditions].filter(Boolean)`)
-  lines.push(`  return allConditions.join(' and ')`)
-  lines.push(`}`)
-  lines.push(``)
-  
-  lines.push(`// Build complete OData URL with query parameters`)
-  lines.push(`const buildODataUrl = <T>(entitySet: string, options: EntityListOptions<T> = {}, id?: string): string => {`)
-  lines.push(`  const baseUrl = \`/api/data/v9.2/\${entitySet}\``)
-  lines.push(`  const url = id ? \`\${baseUrl}(\${id})\` : baseUrl`)
-  lines.push(``)
-  lines.push(`  const queryParams = [`)
-  lines.push(`    options.$select && \`$select=\${Array.isArray(options.$select) ? options.$select.join(',') : options.$select}\`,`)
-  lines.push(`    options.$expand && \`$expand=\${Array.isArray(options.$expand) ? options.$expand.join(',') : options.$expand}\`,`)
-  lines.push(`    options.$filter && \`$filter=\${buildFilter<T>(options.$filter)}\`,`)
-  lines.push(`    options.$orderby && \`$orderby=\${buildOrderBy<T>(options.$orderby)}\`,`)
-  lines.push(`    options.$top && \`$top=\${options.$top}\`,`)
-  lines.push(`    options.$skip && \`$skip=\${options.$skip}\`,`)
-  lines.push(`  ].filter(Boolean)`)
-  lines.push(``)
-  lines.push(`  return queryParams.length > 0 ? \`\${url}?\${queryParams.join('&')}\` : url`)
-  lines.push(`}`)
-  lines.push(``)
-  
-  lines.push(`// Build order by clause`)
-  lines.push(`const buildOrderBy = <T>(orderby: ODataOrderBy<T>): string => {`)
-  lines.push(`  if (Array.isArray(orderby)) {`)
-  lines.push(`    return orderby.join(', ')`)
-  lines.push(`  }`)
-  lines.push(`  return Object.entries(orderby)`)
-  lines.push(`    .map(([field, direction]) => \`\${field} \${direction}\`)`)
-  lines.push(`    .join(', ')`)
-  lines.push(`}`)
-  lines.push(``)
-  
-  
-  // =====================================================================
-  // React Query Hooks
-  // =====================================================================
   
   generateSingleEntityHook(lines, interfaceName, pascalTypeName, entitySetName, primaryKey, entityMetadata, includeComments)
   lines.push('')
@@ -237,9 +130,9 @@ export function generateEntityHooks(
   lines.push(`  /** Key for single entity queries */`)
   lines.push(`  detail: (id: string) => [...${pascalTypeName}QueryKeys.all, 'detail', id] as const,`)
   lines.push(`  /** Key for entity list queries */`)
-  lines.push(`  list: (options?: EntityListOptions<${interfaceName}>) => [...${pascalTypeName}QueryKeys.all, 'list', options] as const,`)
+  lines.push(`  list: (options?: EntityListOptionsWithMetadata<${interfaceName}, typeof ${interfaceName}Metadata>) => [...${pascalTypeName}QueryKeys.all, 'list', options] as const,`)
   lines.push(`  /** Key for entity count queries */`)
-  lines.push(`  count: (options?: EntityListOptions<${interfaceName}>) => [...${pascalTypeName}QueryKeys.all, 'count', options] as const,`)
+  lines.push(`  count: (options?: EntityListOptionsWithMetadata<${interfaceName}, typeof ${interfaceName}Metadata>) => [...${pascalTypeName}QueryKeys.all, 'count', options] as const,`)
   lines.push(`}`)
   
   return lines.join('\n')
@@ -293,7 +186,7 @@ function generateSingleEntityHook(
   lines.push(`    queryFn: async (): Promise<${interfaceName}> => {`)
   lines.push(`      if (!id) throw new Error('ID is required')`)
   lines.push(`      `)
-  lines.push(`      const url = buildODataUrl<${interfaceName}>('${entitySetName}', { $select, $expand }, id)`)
+  lines.push(`      const url = ${pascalTypeName}Queries.buildEntityUrl(id, { $select, $expand })`)
   lines.push(`      const response = await globalFetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
@@ -357,14 +250,14 @@ function generateEntityListHook(
   }
   
   lines.push(`export function use${pascalTypeName}List(`)
-  lines.push(`  options: EntityListOptions<${interfaceName}> & Omit<UseQueryOptions<ODataResponse<${interfaceName}>>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`  options: EntityListOptionsWithMetadata<${interfaceName}, typeof ${interfaceName}Metadata> & Omit<UseQueryOptions<ODataResponse<${interfaceName}>>, 'queryKey' | 'queryFn'> = {}`)
   lines.push(`): UseQueryResult<ODataResponse<${interfaceName}>> {`)
   lines.push(`  const { $filter, $select, $expand, $orderby, $top, $skip, ...queryOptions } = options`)
   lines.push(`  `)
   lines.push(`  return useQuery({`)
   lines.push(`    queryKey: ${pascalTypeName}QueryKeys.list({ $filter, $select, $expand, $orderby, $top, $skip }),`)
   lines.push(`    queryFn: async (): Promise<ODataResponse<${interfaceName}>> => {`)
-  lines.push(`      const url = buildODataUrl<${interfaceName}>('${entitySetName}', { $filter, $select, $expand, $orderby, $top, $skip })`)
+  lines.push(`      const url = ${pascalTypeName}Queries.buildListUrl({ $filter, $select, $expand, $orderby, $top, $skip })`)
   lines.push(`      const response = await globalFetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
@@ -403,15 +296,15 @@ function generateEntityCountHook(
   }
   
   lines.push(`export function use${pascalTypeName}Count(`)
-  lines.push(`  options: Pick<EntityListOptions<${interfaceName}>, '$filter'> & Omit<UseQueryOptions<number>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`  options: Pick<EntityListOptionsWithMetadata<${interfaceName}, typeof ${interfaceName}Metadata>, '$filter'> & Omit<UseQueryOptions<number>, 'queryKey' | 'queryFn'> = {}`)
   lines.push(`): UseQueryResult<number> {`)
   lines.push(`  const { $filter, ...queryOptions } = options`)
   lines.push(`  `)
   lines.push(`  return useQuery({`)
   lines.push(`    queryKey: ${pascalTypeName}QueryKeys.count({ $filter }),`)
   lines.push(`    queryFn: async (): Promise<number> => {`)
-  lines.push(`      const url = buildODataUrl<${interfaceName}>('${entitySetName}', { $filter }) + ($filter ? '&' : '?') + '$count=true'`)
-  lines.push(`      const response = await globalFetch(url.replace('${entitySetName}', '${entitySetName}/$count'))`)
+  lines.push(`      const url = ${pascalTypeName}Queries.buildCountUrl({ $filter })`)
+  lines.push(`      const response = await globalFetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
   lines.push(`        throw new Error(\`Failed to count ${entityMetadata.displayName}: \${response.statusText}\`)`)
@@ -423,6 +316,214 @@ function generateEntityCountHook(
   lines.push(`    ...queryOptions`)
   lines.push(`  })`)
   lines.push(`}`)
+}
+
+/**
+ * Generate query builder utilities for an entity
+ */
+export function generateEntityQueryBuilders(
+  entityMetadata: ProcessedEntityMetadata,
+  options: TypeGenerationOptions = {}
+): string {
+  const { includeComments = true } = options
+  const lines: string[] = []
+  const interfaceName = entityMetadata.schemaName
+  const pascalTypeName = toPascalCaseTypeName(entityMetadata.schemaName)
+  const entitySetName = entityMetadata.entitySetName
+  
+  // File header
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Query Builders for ${entityMetadata.displayName}`)
+    lines.push(` * `)
+    lines.push(` * Auto-generated type-safe query builders for Dataverse entity: ${entityMetadata.logicalName}`)
+    lines.push(` * Provides transparent, modifiable query construction functions`)
+    lines.push(` * `)
+    lines.push(` * @generated ${new Date().toISOString()}`)
+    lines.push(` * @entity ${entityMetadata.displayName} (${entityMetadata.schemaName})`)
+    lines.push(` * @entitySet ${entityMetadata.entitySetName}`)
+    lines.push(` */`)
+  }
+  lines.push('')
+  
+  // Import types and metadata
+  lines.push(`import { ${interfaceName}Metadata } from '../${entityMetadata.logicalName}.js'`)
+  lines.push(`import type { ${interfaceName} } from '../${entityMetadata.logicalName}.js'`)
+  lines.push(`import type {`)
+  lines.push(`    ODataFilter,`)
+  lines.push(`    ODataSelect,`)
+  lines.push(`    ODataExpand,`)
+  lines.push(`    ODataOrderBy,`)
+  lines.push(`    EntityListOptions,`)
+  lines.push(`    ExpandablePropertiesOf`)
+  lines.push(`} from 'dataverse-type-gen'`)
+  lines.push('')
+  
+  // Generate helper functions
+  generateQueryHelperFunctions(lines, interfaceName)
+  
+  // Generate the main query builder object
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Query builders for ${entityMetadata.displayName}`)
+    lines.push(` * `)
+    lines.push(` * These functions provide transparent query building that you can modify.`)
+    lines.push(` * All functions are pure and return URL strings that you can inspect and customize.`)
+    lines.push(` */`)
+  }
+  lines.push(`export const ${pascalTypeName}Queries = {`)
+  lines.push(`  /**`)
+  lines.push(`   * Build URL for fetching a single ${entityMetadata.displayName} by ID`)
+  lines.push(`   */`)
+  lines.push(`  buildEntityUrl: (id: string, options: EntityOptions<${interfaceName}> = {}): string => {`)
+  lines.push(`    return buildODataUrl<${interfaceName}>('${entitySetName}', options, id)`)
+  lines.push(`  },`)
+  lines.push(``)
+  lines.push(`  /**`)
+  lines.push(`   * Build URL for fetching a list of ${entityMetadata.displayName} entities`)
+  lines.push(`   */`)
+  lines.push(`  buildListUrl: (options: EntityListOptions<${interfaceName}> = {}): string => {`)
+  lines.push(`    return buildODataUrl<${interfaceName}>('${entitySetName}', options)`)
+  lines.push(`  },`)
+  lines.push(``)
+  lines.push(`  /**`)
+  lines.push(`   * Build URL for counting ${entityMetadata.displayName} entities`)
+  lines.push(`   */`)
+  lines.push(`  buildCountUrl: (options: Pick<EntityListOptions<${interfaceName}>, '$filter'> = {}): string => {`)
+  lines.push(`    const baseUrl = buildODataUrl<${interfaceName}>('${entitySetName}', options)`)
+  lines.push(`    return baseUrl.replace('${entitySetName}', '${entitySetName}/$count')`)
+  lines.push(`  },`)
+  lines.push(``)
+  lines.push(`  /**`)
+  lines.push(`   * Build OData filter string from filter object`)
+  lines.push(`   */`)
+  lines.push(`  buildFilter: (filter: ODataFilter<${interfaceName}>): string => {`)
+  lines.push(`    return buildFilter<${interfaceName}>(filter)`)
+  lines.push(`  },`)
+  lines.push(``)
+  lines.push(`  /**`)
+  lines.push(`   * Build OData orderby string from orderby object`)
+  lines.push(`   */`)
+  lines.push(`  buildOrderBy: (orderby: ODataOrderBy<${interfaceName}>): string => {`)
+  lines.push(`    return buildOrderBy<${interfaceName}>(orderby)`)
+  lines.push(`  },`)
+  lines.push(``)
+  lines.push(`  /** Entity metadata for reference */`)
+  lines.push(`  entitySet: '${entitySetName}',`)
+  lines.push(`  logicalName: '${entityMetadata.logicalName}',`)
+  lines.push(`  displayName: '${entityMetadata.displayName}'`)
+  lines.push(`}`)
+  
+  return lines.join('\n')
+}
+
+/**
+ * Generate the helper functions used by query builders
+ */
+function generateQueryHelperFunctions(lines: string[], interfaceName: string): void {
+  // EntityOptions type with type-safe expand
+  lines.push(`/** Options for single entity queries with type-safe expand */`)
+  lines.push(`type EntityOptions<T> = {`)
+  lines.push(`    /** Select specific fields (provides IntelliSense) */`)
+  lines.push(`    $select?: ODataSelect<T>`)
+  lines.push(`    /** Expand related entities (type-safe to actual lookup fields and relationships) */`)
+  lines.push(`    $expand?: ExpandablePropertiesOf<typeof ${interfaceName}Metadata>`)
+  lines.push(`}`)
+  lines.push('')
+  
+  // OData operators
+  lines.push(`const odataOperators = {`)
+  lines.push(`    $eq: <T>(field: keyof T, value: any) => \`\${String(field)} eq \${formatValue(value)}\`,`)
+  lines.push(`    $ne: <T>(field: keyof T, value: any) => \`\${String(field)} ne \${formatValue(value)}\`,`)
+  lines.push(`    $gt: <T>(field: keyof T, value: any) => \`\${String(field)} gt \${formatValue(value)}\`,`)
+  lines.push(`    $lt: <T>(field: keyof T, value: any) => \`\${String(field)} lt \${formatValue(value)}\`,`)
+  lines.push(`    $gte: <T>(field: keyof T, value: any) => \`\${String(field)} ge \${formatValue(value)}\`,`)
+  lines.push(`    $lte: <T>(field: keyof T, value: any) => \`\${String(field)} le \${formatValue(value)}\`,`)
+  lines.push(`    $contains: <T>(field: keyof T, value: string) => \`contains(\${String(field)}, '\${value}')\`,`)
+  lines.push(`    $startswith: <T>(field: keyof T, value: string) => \`startswith(\${String(field)}, '\${value}')\`,`)
+  lines.push(`    $endswith: <T>(field: keyof T, value: string) => \`endswith(\${String(field)}, '\${value}')\`,`)
+  lines.push(`    $in: <T>(field: keyof T, values: any[]) => \`\${String(field)} in (\${values.map(formatValue).join(',')})\`,`)
+  lines.push(`} as const`)
+  lines.push('')
+  
+  // Format value function
+  lines.push(`const formatValue = (value: any): string => {`)
+  lines.push(`    if (value === null || value === undefined) return 'null'`)
+  lines.push(`    if (typeof value === 'string') return \`'\${value.replace(/'/g, "''")}\``)
+  lines.push(`    if (value instanceof Date) return \`'\${value.toISOString()}'\``)
+  lines.push(`    if (typeof value === 'boolean') return value.toString()`)
+  lines.push(`    return String(value)`)
+  lines.push(`}`)
+  lines.push('')
+  
+  // Build filter function
+  lines.push(`// Build OData filter string with support for logical operators`)
+  lines.push(`const buildFilter = <T>(filter: ODataFilter<T>): string => {`)
+  lines.push(`    const conditions = Object.entries(filter)`)
+  lines.push(`        .filter(([key]) => !key.startsWith('$'))`)
+  lines.push(`        .map(([field, value]) => {`)
+  lines.push(`            if (typeof value === 'object' && value !== null && !(value instanceof Date)) {`)
+  lines.push(`                return Object.entries(value)`)
+  lines.push(`                    .map(([op, val]) => {`)
+  lines.push(`                        const operatorFn = odataOperators[op as keyof typeof odataOperators]`)
+  lines.push(`                        return operatorFn ? operatorFn<T>(field as keyof T, val) : null`)
+  lines.push(`                    })`)
+  lines.push(`                    .filter(Boolean)`)
+  lines.push(`                    .join(' and ')`)
+  lines.push(`            }`)
+  lines.push(`            return odataOperators.$eq<T>(field as keyof T, value)`)
+  lines.push(`        })`)
+  lines.push(`        .filter(Boolean)`)
+  lines.push(``)
+  lines.push(`    // Handle $and and $or logical operators`)
+  lines.push(`    const logicalConditions: string[] = []`)
+  lines.push(`    if ('$and' in filter && filter.$and) {`)
+  lines.push(`        const andConditions = filter.$and.map(f => buildFilter<T>(f)).filter(Boolean)`)
+  lines.push(`        if (andConditions.length > 0) {`)
+  lines.push(`            logicalConditions.push(\`(\${andConditions.join(' and ')})\`)`)
+  lines.push(`        }`)
+  lines.push(`    }`)
+  lines.push(`    if ('$or' in filter && filter.$or) {`)
+  lines.push(`        const orConditions = filter.$or.map(f => buildFilter<T>(f)).filter(Boolean)`)
+  lines.push(`        if (orConditions.length > 0) {`)
+  lines.push(`            logicalConditions.push(\`(\${orConditions.join(' or ')})\`)`)
+  lines.push(`        }`)
+  lines.push(`    }`)
+  lines.push(``)
+  lines.push(`    const allConditions = [...conditions, ...logicalConditions].filter(Boolean)`)
+  lines.push(`    return allConditions.join(' and ')`)
+  lines.push(`}`)
+  lines.push('')
+  
+  // Build OData URL function
+  lines.push(`// Build complete OData URL with query parameters`)
+  lines.push(`const buildODataUrl = <T>(entitySet: string, options: EntityListOptions<T> = {}, id?: string): string => {`)
+  lines.push(`    const baseUrl = \`/api/data/v9.2/\${entitySet}\``)
+  lines.push(`    const url = id ? \`\${baseUrl}(\${id})\` : baseUrl`)
+  lines.push(``)
+  lines.push(`    const queryParams = [`)
+  lines.push(`        options.$select && \`$select=\${options.$select.join(',')}\`,`)
+  lines.push(`        options.$expand && \`$expand=\${options.$expand.join(',')}\`,`)
+  lines.push(`        options.$filter && \`$filter=\${buildFilter<T>(options.$filter)}\`,`)
+  lines.push(`        options.$orderby && \`$orderby=\${buildOrderBy<T>(options.$orderby)}\`,`)
+  lines.push(`        options.$top !== undefined && \`$top=\${options.$top}\`,`)
+  lines.push(`        options.$skip !== undefined && \`$skip=\${options.$skip}\`,`)
+  lines.push(`        options.$count && \`$count=true\`,`)
+  lines.push(`        options.$search && \`$search=\${encodeURIComponent(options.$search)}\`,`)
+  lines.push(`    ].filter(Boolean)`)
+  lines.push(``)
+  lines.push(`    return queryParams.length > 0 ? \`\${url}?\${queryParams.join('&')}\` : url`)
+  lines.push(`}`)
+  lines.push('')
+  
+  // Build order by function
+  lines.push(`// Build order by clause`)
+  lines.push(`const buildOrderBy = <T>(orderby: ODataOrderBy<T>): string => {`)
+  lines.push(`    return Object.entries(orderby)`)
+  lines.push(`        .map(([field, direction]) => \`\${field} \${direction}\`)`)
+  lines.push(`        .join(', ')`)
+  lines.push(`}`)
+  lines.push('')
 }
 
 /**
@@ -456,6 +557,41 @@ export function generateEntityHooksFile(
   
   // Generate the hooks
   lines.push(generateEntityHooks(entityMetadata, options))
+  
+  return lines.join('\n')
+}
+
+/**
+ * Generate a query builders file for an entity  
+ */
+export function generateEntityQueryBuildersFile(
+  entityMetadata: ProcessedEntityMetadata,
+  options: TypeGenerationOptions = {}
+): string {
+  const { includeComments = true } = options
+  const lines: string[] = []
+  
+  // File header with clear documentation
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Query Builders for ${entityMetadata.displayName}`)
+    lines.push(` * `)
+    lines.push(` * Auto-generated type-safe query builders for Dataverse entity: ${entityMetadata.logicalName}`)
+    lines.push(` * These are transparent, modifiable functions that you can customize as needed`)
+    lines.push(` * `)
+    lines.push(` * @generated ${new Date().toISOString()}`)
+    lines.push(` * @entity ${entityMetadata.displayName} (${entityMetadata.schemaName})`)
+    lines.push(` * @entitySet ${entityMetadata.entitySetName}`)
+    lines.push(` */`)
+  } else {
+    lines.push(`// Generated query builders for ${entityMetadata.schemaName}`)
+    lines.push(`// Entity: ${entityMetadata.displayName}`)  
+    lines.push(`// Generated: ${new Date().toISOString()}`)
+  }
+  lines.push('')
+  
+  // Generate the query builders
+  lines.push(generateEntityQueryBuilders(entityMetadata, options))
   
   return lines.join('\n')
 }

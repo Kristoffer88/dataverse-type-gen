@@ -101,17 +101,17 @@ export type ODataFilter<TEntity> = {
 // Select specific fields from entity
 export type ODataSelect<TEntity> = (keyof TEntity)[]
 
-// Expand related entities
-export type ODataExpand<TEntity> = {
-  [K in keyof TEntity]?: TEntity[K] extends string ? 
-    K extends `${string}id` | `_${string}_value` ? {
-      $select?: string[]
-      $filter?: Record<string, unknown>
-      $orderby?: string[]
-      $top?: number
-    } : never : 
-    never
-}[keyof TEntity][] | string[]
+// Base expand type for entities without metadata
+export type ODataExpand = string[]
+
+// Type-safe expand using entity metadata
+export type ODataExpandWithMetadata<TMetadata extends { expandableProperties: readonly string[] }> = 
+  TMetadata['expandableProperties'][number][]
+
+// Helper type to extract expandable properties from entity with metadata
+export type ExpandablePropertiesOf<T> = T extends { expandableProperties: readonly string[] } 
+  ? T['expandableProperties'][number][]
+  : string[]
 
 // Order by with direction
 export type ODataOrderBy<TEntity> = {
@@ -122,11 +122,52 @@ export type ODataOrderBy<TEntity> = {
 export interface ODataQueryOptions<TEntity> {
   $filter?: ODataFilter<TEntity>
   $select?: ODataSelect<TEntity>
-  $expand?: ODataExpand<TEntity>
+  $expand?: ODataExpand
   $orderby?: ODataOrderBy<TEntity>
   $top?: number
   $skip?: number
   $count?: boolean
+  $search?: string
+}
+
+// Strict type for entity list queries (prevents arbitrary properties)
+export interface EntityListOptions<TEntity> {
+  /** Select specific fields (provides IntelliSense) */
+  $select?: ODataSelect<TEntity>
+  /** Expand related entities */
+  $expand?: ODataExpand
+  /** Filter entities (type-safe field names and operators) */
+  $filter?: ODataFilter<TEntity>
+  /** Sort results by fields with direction */
+  $orderby?: ODataOrderBy<TEntity>
+  /** Limit number of results */
+  $top?: number
+  /** Skip results for pagination */
+  $skip?: number
+  /** Include count in response */
+  $count?: boolean
+  /** Search across fields */
+  $search?: string
+}
+
+// Type-safe entity list options using metadata for expand constraints
+export interface EntityListOptionsWithMetadata<TEntity, TMetadata extends { expandableProperties: readonly string[] }> {
+  /** Select specific fields (provides IntelliSense) */
+  $select?: ODataSelect<TEntity>
+  /** Expand related entities (type-safe to actual lookup fields and relationships) */
+  $expand?: TMetadata['expandableProperties'][number][]
+  /** Filter entities (type-safe field names and operators) */
+  $filter?: ODataFilter<TEntity>
+  /** Sort results by fields with direction */
+  $orderby?: ODataOrderBy<TEntity>
+  /** Limit number of results */
+  $top?: number
+  /** Skip results for pagination */
+  $skip?: number
+  /** Include count in response */
+  $count?: boolean
+  /** Search across fields */
+  $search?: string
 }
 
 // Entity metadata interface for runtime information

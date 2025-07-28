@@ -317,6 +317,18 @@ export function generateMetadataObject(
     lines.push(`  optionSets: [${entityMetadata.optionSets.map(os => `"${os.name}"`).join(', ')}],`)
   }
   
+  // Expandable properties for $expand operations
+  if (entityMetadata.expandableProperties.length > 0) {
+    lines.push(`  expandableProperties: [`)
+    entityMetadata.expandableProperties.forEach(prop => {
+      const comment = lookupAttributes.some(attr => attr.logicalName === prop) 
+        ? ' // Lookup field' 
+        : ' // Relationship'
+      lines.push(`    "${prop}",${comment}`)
+    })
+    lines.push(`  ],`)
+  }
+  
   // Generation info
   lines.push(`  generated: "${new Date().toISOString()}"`)
   

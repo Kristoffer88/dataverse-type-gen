@@ -1,7 +1,7 @@
 import type { 
   EntityDefinition, 
   AttributeMetadata,
-  LocalizedLabel 
+  LocalizedLabel
 } from '../types.js'
 import type {
   GlobalOptionSetDefinition,
@@ -26,6 +26,10 @@ export interface ProcessedEntityMetadata {
   isCustomEntity: boolean
   attributes: ProcessedAttributeMetadata[]
   optionSets: ProcessedOptionSet[]
+  expandableProperties: string[] // Lookup fields + relationship names for $expand
+  oneToManyRelationships: ProcessedRelationshipMetadata[]
+  manyToOneRelationships: ProcessedRelationshipMetadata[]
+  manyToManyRelationships: ProcessedManyToManyRelationshipMetadata[]
 }
 
 /**
@@ -103,6 +107,31 @@ export interface ProcessedOption {
 }
 
 /**
+ * Processed relationship metadata for type generation
+ */
+export interface ProcessedRelationshipMetadata {
+  schemaName: string
+  referencedEntity: string
+  referencedAttribute: string
+  referencingEntity: string
+  referencingAttribute: string
+  isCustomRelationship: boolean
+}
+
+/**
+ * Processed many-to-many relationship metadata for type generation
+ */
+export interface ProcessedManyToManyRelationshipMetadata {
+  schemaName: string
+  entity1LogicalName: string
+  entity1IntersectAttribute: string
+  entity2LogicalName: string
+  entity2IntersectAttribute: string
+  intersectEntityName: string
+  isCustomRelationship: boolean
+}
+
+/**
  * Extract display name from localized label structure
  */
 function extractDisplayName(localizedLabel?: LocalizedLabel): string {
@@ -148,7 +177,11 @@ export function processEntityMetadata(entityMetadata: EntityDefinition): Process
     entitySetName: entityMetadata.EntitySetName || '',
     isCustomEntity: entityMetadata.IsCustomEntity,
     attributes: [],
-    optionSets: []
+    optionSets: [],
+    expandableProperties: [],
+    oneToManyRelationships: [],
+    manyToOneRelationships: [],
+    manyToManyRelationships: []
   }
   
   // Process attributes if available
@@ -157,6 +190,56 @@ export function processEntityMetadata(entityMetadata: EntityDefinition): Process
     
     // Extract option sets from attributes
     processed.optionSets = extractOptionSetsFromAttributes(entityMetadata.Attributes)
+    
+    // Extract expandable properties (lookup fields for many-to-one relationships)
+    const lookupFields = processed.attributes
+      .filter(attr => attr.attributeType === 'Lookup')
+      .map(attr => attr.logicalName)
+    
+    processed.expandableProperties = [...lookupFields]
+  }
+  
+  // Process relationships if available
+  if (entityMetadata.OneToManyRelationships) {
+    processed.oneToManyRelationships = entityMetadata.OneToManyRelationships.map(rel => ({
+      schemaName: rel.SchemaName,
+      referencedEntity: rel.ReferencedEntity,
+      referencedAttribute: rel.ReferencedAttribute,
+      referencingEntity: rel.ReferencingEntity,
+      referencingAttribute: rel.ReferencingAttribute,
+      isCustomRelationship: rel.IsCustomRelationship
+    }))
+    
+    // Add one-to-many relationship names to expandable properties
+    const oneToManyNames = processed.oneToManyRelationships.map(rel => rel.schemaName)
+    processed.expandableProperties.push(...oneToManyNames)
+  }
+  
+  if (entityMetadata.ManyToOneRelationships) {
+    processed.manyToOneRelationships = entityMetadata.ManyToOneRelationships.map(rel => ({
+      schemaName: rel.SchemaName,
+      referencedEntity: rel.ReferencedEntity,
+      referencedAttribute: rel.ReferencedAttribute,
+      referencingEntity: rel.ReferencingEntity,
+      referencingAttribute: rel.ReferencingAttribute,
+      isCustomRelationship: rel.IsCustomRelationship
+    }))
+  }
+  
+  if (entityMetadata.ManyToManyRelationships) {
+    processed.manyToManyRelationships = entityMetadata.ManyToManyRelationships.map(rel => ({
+      schemaName: rel.SchemaName,
+      entity1LogicalName: rel.Entity1LogicalName,
+      entity1IntersectAttribute: rel.Entity1IntersectAttribute,
+      entity2LogicalName: rel.Entity2LogicalName,
+      entity2IntersectAttribute: rel.Entity2IntersectAttribute,
+      intersectEntityName: rel.IntersectEntityName,
+      isCustomRelationship: rel.IsCustomRelationship
+    }))
+    
+    // Add many-to-many relationship names to expandable properties
+    const manyToManyNames = processed.manyToManyRelationships.map(rel => rel.schemaName)
+    processed.expandableProperties.push(...manyToManyNames)
   }
   
   return processed

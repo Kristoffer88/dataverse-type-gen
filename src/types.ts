@@ -32,6 +32,9 @@ export interface EntityDefinition {
   PrimaryNameAttribute: string
   EntitySetName: string
   Attributes?: AttributeMetadata[]
+  OneToManyRelationships?: OneToManyRelationshipMetadata[]
+  ManyToOneRelationships?: ManyToOneRelationshipMetadata[]
+  ManyToManyRelationships?: ManyToManyRelationshipMetadata[]
 }
 
 export interface LocalizedLabel {
@@ -89,4 +92,38 @@ export interface DataverseErrorDetails {
 
 export interface OptionSetConstant {
   [key: string]: { Value: number; Label: string }
+}
+
+export interface OneToManyRelationshipMetadata {
+  MetadataId: string
+  SchemaName: string
+  ReferencedEntity: string
+  ReferencedAttribute: string
+  ReferencingEntity: string
+  ReferencingAttribute: string
+  RelationshipType: string
+  IsCustomRelationship: boolean
+}
+
+export interface ManyToOneRelationshipMetadata {
+  MetadataId: string
+  SchemaName: string
+  ReferencedEntity: string
+  ReferencedAttribute: string
+  ReferencingEntity: string
+  ReferencingAttribute: string
+  RelationshipType: string
+  IsCustomRelationship: boolean
+}
+
+export interface ManyToManyRelationshipMetadata {
+  MetadataId: string
+  SchemaName: string
+  Entity1LogicalName: string
+  Entity1IntersectAttribute: string
+  Entity2LogicalName: string
+  Entity2IntersectAttribute: string
+  IntersectEntityName: string
+  RelationshipType: string
+  IsCustomRelationship: boolean
 }

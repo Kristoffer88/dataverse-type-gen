@@ -202,6 +202,51 @@ const { data: account } = useAccount(accountId, {
 })
 ```
 
+### Query Builders (Recommended)
+
+**🎯 New Approach**: The generator now creates transparent, modifiable query builders alongside hooks. This gives you full control and visibility over URL construction:
+
+```typescript
+import { AccountQueries } from './generated/queries/account.queries'
+
+// Build URLs with full transparency - you can see exactly what's generated
+const listUrl = AccountQueries.buildListUrl({
+  $filter: { name: { $contains: 'contoso' } },
+  $select: ['name', 'telephone1'],
+  $orderby: { name: 'asc' },
+  $top: 10
+})
+// Result: /api/data/v9.2/accounts?$filter=contains(name,'contoso')&$select=name,telephone1&$orderby=name asc&$top=10
+
+const singleUrl = AccountQueries.buildEntityUrl(accountId, {
+  $select: ['name', 'primarycontactid']
+})
+
+const countUrl = AccountQueries.buildCountUrl({
+  $filter: { statecode: 0 }
+})
+```
+
+**Why Query Builders are Better:**
+
+- ✅ **Transparent**: You can see and modify the generated code
+- ✅ **Debuggable**: No abstraction layer to troubleshoot through
+- ✅ **Customizable**: Edit the generated functions for specific needs
+- ✅ **Type-safe**: Full TypeScript support with entity-specific types
+- ✅ **Self-contained**: Each entity has its own complete query logic
+
+**Migration from DataverseUrls:**
+
+```typescript
+// ❌ Old approach (abstract, hard to debug)
+import { DataverseUrls } from 'dataverse-type-gen'
+const url = DataverseUrls.entitySet(metadata, options)
+
+// ✅ New approach (transparent, modifiable)
+import { AccountQueries } from './generated/queries/account.queries'
+const url = AccountQueries.buildListUrl(options)
+```
+
 ## CLI Commands
 
 ### `generate` - Generate TypeScript Types

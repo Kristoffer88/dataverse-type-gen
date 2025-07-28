@@ -446,7 +446,7 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
       try {
         const rawMetadata = await fetchEntityMetadata(entityName, {
           includeAttributes: true,
-          includeRelationships: false
+          includeRelationships: true
         })
         
         if (rawMetadata) {
