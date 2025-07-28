@@ -3,6 +3,7 @@ import { join, dirname } from 'path'
 import { Project, ScriptTarget, ModuleKind } from 'ts-morph'
 import type { GeneratedCode, TypeGenerationOptions } from '../generators/index.js'
 import { generateEntityFile, generateImports, generateGlobalOptionSetFile } from '../generators/index.js'
+import { generateEntityHooksFile } from '../generators/query-hooks.js'
 import type { ProcessedEntityMetadata, ProcessedOptionSet } from '../processors/index.js'
 
 /**
@@ -15,6 +16,7 @@ export interface CodeGenConfig {
   prettier: boolean
   eslint: boolean
   overwrite: boolean
+  generateHooks: boolean
   typeGenerationOptions: TypeGenerationOptions
 }
 
@@ -52,6 +54,7 @@ const DEFAULT_CONFIG: CodeGenConfig = {
   prettier: true,
   eslint: false,
   overwrite: true,
+  generateHooks: true,
   typeGenerationOptions: {
     includeComments: true,
     includeValidation: true,
@@ -114,6 +117,68 @@ export async function writeGlobalOptionSetDeclaration(
   } catch (error) {
     return {
       filePath: join(finalConfig.outputDir, 'global-choices', `${optionSet.name.toLowerCase()}${finalConfig.fileExtension}`),
+      content: '',
+      size: 0,
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
+    }
+  }
+}
+
+/**
+ * Write React Query hooks file for an entity
+ */
+export async function writeEntityHooksFile(
+  entityMetadata: ProcessedEntityMetadata,
+  config: Partial<CodeGenConfig> = {}
+): Promise<GeneratedFileResult> {
+  const finalConfig = { ...DEFAULT_CONFIG, ...config }
+
+  try {
+    // Generate the hooks code
+    const content = generateEntityHooksFile(entityMetadata, finalConfig.typeGenerationOptions)
+    
+    // Format the code if prettier is enabled
+    const formattedContent = finalConfig.prettier 
+      ? await formatCode(content)
+      : content
+
+    // Determine file path - hooks files go in a hooks subdirectory
+    const fileName = `${entityMetadata.logicalName}.hooks${finalConfig.fileExtension}`
+    const filePath = join(finalConfig.outputDir, 'hooks', fileName)
+
+    // Ensure output directory exists
+    await fs.mkdir(dirname(filePath), { recursive: true })
+
+    // Check if file exists and overwrite setting
+    if (!finalConfig.overwrite) {
+      try {
+        await fs.access(filePath)
+        return {
+          filePath,
+          content: formattedContent,
+          size: Buffer.byteLength(formattedContent, 'utf8'),
+          success: false,
+          error: 'File exists and overwrite is disabled'
+        }
+      } catch {
+        // File doesn't exist, proceed with writing
+      }
+    }
+
+    // Write the file
+    await fs.writeFile(filePath, formattedContent, 'utf8')
+
+    return {
+      filePath,
+      content: formattedContent,
+      size: Buffer.byteLength(formattedContent, 'utf8'),
+      success: true
+    }
+
+  } catch (error) {
+    return {
+      filePath: join(finalConfig.outputDir, 'hooks', `${entityMetadata.logicalName}.hooks${finalConfig.fileExtension}`),
       content: '',
       size: 0,
       success: false,
@@ -227,11 +292,17 @@ export async function generateMultipleEntityTypes(
   for (let i = 0; i < entities.length; i += batchSize) {
     const batch = entities.slice(i, i + batchSize)
     
-    const batchPromises = batch.map(entity => 
+    // Generate type declarations
+    const typePromises = batch.map(entity => 
       writeEntityTypeDeclaration(entity, finalConfig)
     )
     
-    const batchResults = await Promise.all(batchPromises)
+    // Generate hooks if enabled
+    const hookPromises = finalConfig.generateHooks 
+      ? batch.map(entity => writeEntityHooksFile(entity, finalConfig))
+      : []
+    
+    const batchResults = await Promise.all([...typePromises, ...hookPromises])
     results.push(...batchResults)
     
     // Small delay between batches to be respectful to the system

@@ -18,6 +18,12 @@ export * from './codegen/index.js'
 export * from './config/index.js'
 export * from './cli/index.js'
 
+// Query utilities and React Query hooks
+export * from './query/types.js'
+export * from './query/url-builders.js'
+export * from './query/hooks.js'
+export * from './query/standalone.js'
+
 // Main public API functions
 import { 
   fetchEntityMetadata,

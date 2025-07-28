@@ -39,6 +39,8 @@ export interface DataverseTypeGenConfig {
     entityPrefix?: string
     /** Include barrel export index file */
     indexFile?: boolean
+    /** Generate React Query hooks alongside types */
+    generateHooks?: boolean
   }
   
   
@@ -58,7 +60,8 @@ export const DEFAULT_CONFIG: DataverseTypeGenConfig = {
     useExactTypes: true,
     includeLookupValues: true,
     includeBindingTypes: true,
-    indexFile: true
+    indexFile: true,
+    generateHooks: true
   }
 }
 
@@ -302,6 +305,7 @@ export function toCodeGenConfig(config: DataverseTypeGenConfig): CodeGenConfig {
     prettier: true, // Default to prettier
     eslint: false, // Default to no eslint
     overwrite: true, // Default to overwrite
+    generateHooks: config.typeGeneration.generateHooks ?? true,
     typeGenerationOptions: {
       entityPrefix: config.typeGeneration.entityPrefix,
       includeComments: config.typeGeneration.includeComments,
