@@ -116,6 +116,8 @@ tmp/
 
 generated
 test-output
+pcf-demo/
+test-types-api/
 
 msdocs
 MANUAL_TESTS.txt

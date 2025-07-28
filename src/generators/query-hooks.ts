@@ -644,11 +644,3 @@ function generateOptionSetConstantName(optionSetName: string): string {
     .join('')
 }
 
-function getFirstOptionSetExample(entityMetadata: ProcessedEntityMetadata): string {
-  const stateAttribute = entityMetadata.attributes.find(attr => attr.logicalName === 'statecode')
-  if (stateAttribute?.optionSetName) {
-    const constantName = generateOptionSetConstantName(stateAttribute.optionSetName)
-    return `${constantName}.Active.Value`
-  }
-  return '0 // Active'
-}

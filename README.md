@@ -182,6 +182,26 @@ export const AccountBindings = {
 };
 ```
 
+### React Query Hooks
+
+When `generateHooks: true` is enabled, the generator creates type-safe React Query hooks:
+
+```typescript
+import { useAccountList, useAccount } from './generated'
+
+// List accounts with type-safe filtering
+const { data: accounts } = useAccountList({
+  $select: ['name', 'telephone1'], // ✅ IntelliSense support
+  $filter: { name: { $contains: 'contoso' } },
+  $top: 10
+})
+
+// Get single account
+const { data: account } = useAccount(accountId, {
+  $select: ['name', 'primarycontactid']
+})
+```
+
 ## CLI Commands
 
 ### `generate` - Generate TypeScript Types
