@@ -256,13 +256,14 @@ export async function writeEntityQueryBuildersFile(
  */
 export async function writeEntityTypeDeclaration(
   entityMetadata: ProcessedEntityMetadata,
-  config: Partial<CodeGenConfig> = {}
+  config: Partial<CodeGenConfig> = {},
+  allEntities: ProcessedEntityMetadata[] = []
 ): Promise<GeneratedFileResult> {
   const finalConfig = { ...DEFAULT_CONFIG, ...config }
 
   try {
     // Generate the code
-    const generatedCode = generateEntityFile(entityMetadata, finalConfig.typeGenerationOptions)
+    const generatedCode = generateEntityFile(entityMetadata, finalConfig.typeGenerationOptions, allEntities)
     
     // Combine all parts into final content
     const content = combineGeneratedCode(generatedCode)
@@ -389,7 +390,7 @@ export async function generateMultipleEntityTypes(
     
     // Generate type declarations
     const typePromises = batch.map(entity => 
-      writeEntityTypeDeclaration(entity, finalConfig)
+      writeEntityTypeDeclaration(entity, finalConfig, allEntities)
     )
     
     // Generate hooks for entities that need them (primary + related entities referenced in hooks)
@@ -912,6 +913,7 @@ async function generateQueryTypesFile(config: CodeGenConfig): Promise<string> {
  */
 function generateFallbackQueryTypes(): string {
   return `// Basic OData query types for Dataverse operations
+// NOTE: Use entity-specific expand types instead of these generic types for full type safety
 
 export type ODataFilter<TEntity> = {
   [K in keyof TEntity]?: any
@@ -923,9 +925,8 @@ export type ODataFilter<TEntity> = {
 
 export type ODataSelect<TEntity> = (keyof TEntity)[]
 
-export type ODataExpand<TMetadata = any> = TMetadata extends { expandableProperties: readonly string[] }
-  ? TMetadata['expandableProperties'][number][] | Record<string, { $select?: string[], $filter?: any, $orderby?: any, $top?: number }>
-  : string[] | Record<string, any>
+// Generic fallback - entity-specific types should override this
+export type ODataExpand<TMetadata = any> = string[] | Record<string, any>
 
 export type ODataOrderBy<TEntity> = {
   [K in keyof TEntity]?: 'asc' | 'desc'

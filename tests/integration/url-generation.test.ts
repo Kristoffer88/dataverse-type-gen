@@ -1,6 +1,6 @@
 /**
  * Integration tests specifically for URL generation correctness
- * Validates that URLs are properly formatted for the krapowerppm.crm4.dynamics.com instance
+ * Validates that URLs are properly formatted for the ssopowerppm.crm4.dynamics.com instance
  */
 
 import { describe, test, expect, beforeAll } from 'vitest'
@@ -11,7 +11,7 @@ import {
 import type { EntityMetadata } from '../../src/query/types.js'
 
 // Test configuration
-const DATAVERSE_URL = 'https://krapowerppm.crm4.dynamics.com'
+const DATAVERSE_URL = 'https://ssopowerppm.crm4.dynamics.com'
 const API_VERSION = 'v9.1'
 
 beforeAll(() => {

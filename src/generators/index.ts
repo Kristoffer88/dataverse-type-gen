@@ -329,6 +329,20 @@ export function generateMetadataObject(
     lines.push(`  ],`)
   }
   
+  // Related entities for type-safe nested expands
+  if (Object.keys(entityMetadata.relatedEntities).length > 0) {
+    lines.push(`  relatedEntities: {`)
+    Object.entries(entityMetadata.relatedEntities).forEach(([relationshipName, info]) => {
+      lines.push(`    "${relationshipName}": {`)
+      lines.push(`      relationshipName: "${info.relationshipName}",`)
+      lines.push(`      targetEntityLogicalName: "${info.targetEntityLogicalName}",`)
+      lines.push(`      targetEntitySetName: "${info.targetEntitySetName}",`)
+      lines.push(`      relationshipType: "${info.relationshipType}"`)
+      lines.push(`    },`)
+    })
+    lines.push(`  },`)
+  }
+  
   // Generation info
   lines.push(`  generated: "${new Date().toISOString()}"`)
   
@@ -342,7 +356,8 @@ export function generateMetadataObject(
  */
 export function generateEntityFile(
   entityMetadata: ProcessedEntityMetadata,
-  options: TypeGenerationOptions = {}
+  options: TypeGenerationOptions = {},
+  allEntities: ProcessedEntityMetadata[] = []
 ): GeneratedCode {
   const lines: string[] = []
   const imports: Set<string> = new Set()
@@ -386,11 +401,15 @@ export function generateEntityFile(
 
   // Generate binding types if enabled
   const bindingTypes = options.includeBindingTypes 
-    ? generateBindingTypes(entityMetadata, options)
+    ? generateBindingTypes(entityMetadata, options, allEntities)
     : undefined
 
   // Generate expand types for type-safe $expand operations
-  const expandTypes = generateExpandTypes(entityMetadata, options)
+  const expandResult = generateExpandTypes(entityMetadata, options, allEntities)
+  const expandTypes = expandResult.expandTypes
+  
+  // Add related entity imports to the imports set
+  expandResult.relatedEntityImports.forEach(imp => imports.add(imp))
 
   // Generate metadata object
   const metadata = options.includeMetadata 
@@ -414,32 +433,23 @@ export function generateEntityFile(
   }
 }
 
-/**
- * Convert schema name to proper Pascal case type name
- * Example: "pum_CostResource" -> "PumCostResource"
- */
-function toPascalCaseTypeName(schemaName: string): string {
-  // Handle names that start with lowercase prefix followed by underscore and PascalCase
-  // e.g., "pum_CostResource" -> "PumCostResource"
-  if (schemaName.includes('_')) {
-    const parts = schemaName.split('_')
-    return parts.map(part => 
-      part.charAt(0).toUpperCase() + part.slice(1)
-    ).join('')
-  }
-  
-  // For names that are already in the right format, just ensure first letter is uppercase
-  return schemaName.charAt(0).toUpperCase() + schemaName.slice(1)
-}
+
 
 /**
  * Generate binding types for @odata.bind operations
  */
 function generateBindingTypes(
   entityMetadata: ProcessedEntityMetadata,
-  options: TypeGenerationOptions
+  options: TypeGenerationOptions,
+  allEntities: ProcessedEntityMetadata[] = []
 ): string {
   const { includeComments = true } = options
+  
+  // Create lookup dictionary from actual metadata
+  const entityLookup = new Map<string, ProcessedEntityMetadata>()
+  allEntities.forEach(entity => {
+    entityLookup.set(entity.logicalName, entity)
+  })
   
   // Filter out read-only system fields that cannot be set via @odata.bind
   const readOnlySystemFields = new Set([
@@ -461,7 +471,7 @@ function generateBindingTypes(
   }
 
   const lines: string[] = []
-  const pascalTypeName = toPascalCaseTypeName(entityMetadata.schemaName)
+  const schemaTypeName = entityMetadata.schemaName
   
   if (includeComments) {
     lines.push(`/**`)
@@ -469,7 +479,7 @@ function generateBindingTypes(
     lines.push(` */`)
   }
   
-  lines.push(`export type ${pascalTypeName}Bindings = {`)
+  lines.push(`export type ${schemaTypeName}Bindings = {`)
   
   for (const attr of lookupAttributes) {
     const bindingProperty = `${attr.schemaName}@odata.bind`
@@ -485,7 +495,7 @@ function generateBindingTypes(
   lines.push(` * Type-safe helper functions for creating ${entityMetadata.schemaName} @odata.bind relationships`)
   lines.push(` * Each function returns the correct entity set path for the target entity`)
   lines.push(` */`)
-  lines.push(`export const ${pascalTypeName}Bindings = {`)
+  lines.push(`export const ${schemaTypeName}Bindings = {`)
   
   for (const attr of lookupAttributes) {
     const functionName = attr.logicalName
@@ -494,7 +504,11 @@ function generateBindingTypes(
     if (targets.length === 1) {
       // Single target - type-safe function
       const target = targets[0]
-      const entitySet = getEntitySetForTarget(target)
+      const targetEntity = entityLookup.get(target)
+      if (!targetEntity) {
+        throw new Error(`Entity metadata not found for target entity: ${target}. This entity should be included in the allEntities array passed to generateBindingTypes.`)
+      }
+      const entitySet = targetEntity.entitySetName
       lines.push(`  /** Create @odata.bind for ${attr.logicalName} -> ${target} */`)
       lines.push(`  ${functionName}: (id: string): { '${attr.schemaName}@odata.bind': string } => ({`)
       lines.push(`    '${attr.schemaName}@odata.bind': \`/${entitySet}(\${id})\``)
@@ -505,7 +519,11 @@ function generateBindingTypes(
       lines.push(`  ${functionName}: (id: string, entityType: '${targets.join("' | '")}') => {`)
       lines.push(`    const entitySets = {`)
       targets.forEach(target => {
-        const entitySet = getEntitySetForTarget(target)
+        const targetEntity = entityLookup.get(target)
+        if (!targetEntity) {
+          throw new Error(`Entity metadata not found for target entity: ${target}. This entity should be included in the allEntities array passed to generateBindingTypes.`)
+        }
+        const entitySet = targetEntity.entitySetName
         lines.push(`      '${target}': '${entitySet}',`)
       })
       lines.push(`    } as const;`)
@@ -524,7 +542,7 @@ function generateBindingTypes(
   
   // Add Create and Update utility types with bindings
   lines.push('')
-  lines.push(`export type ${pascalTypeName}Create = Partial<${entityMetadata.schemaName}> & Partial<${pascalTypeName}Bindings> & {`)
+  lines.push(`export type ${schemaTypeName}Create = Partial<${entityMetadata.schemaName}> & Partial<${schemaTypeName}Bindings> & {`)
   
   // Only add primary name attribute if it exists and is not empty
   const primaryNameAttr = entityMetadata.primaryNameAttribute?.trim()
@@ -535,7 +553,7 @@ function generateBindingTypes(
   lines.push(`};`)
   
   lines.push('')
-  lines.push(`export type ${pascalTypeName}Update = Partial<Omit<${entityMetadata.schemaName}, '${entityMetadata.primaryIdAttribute}'>> & Partial<${pascalTypeName}Bindings> & {`)
+  lines.push(`export type ${schemaTypeName}Update = Partial<Omit<${entityMetadata.schemaName}, '${entityMetadata.primaryIdAttribute}'>> & Partial<${schemaTypeName}Bindings> & {`)
   
   // Primary ID attribute should always exist, but add safety check
   const primaryIdAttr = entityMetadata.primaryIdAttribute?.trim()
@@ -548,33 +566,6 @@ function generateBindingTypes(
   return lines.join('\n')
 }
 
-/**
- * Get the entity set name for a target entity type
- */
-function getEntitySetForTarget(target?: string): string {
-  if (!target) return 'entities'
-  
-  // Common entity set mappings
-  const entitySetMap: Record<string, string> = {
-    'systemuser': 'systemusers',
-    'team': 'teams', 
-    'businessunit': 'businessunits',
-    'transactioncurrency': 'transactioncurrencies'
-  }
-  
-  // Check if we have a specific mapping
-  if (entitySetMap[target]) {
-    return entitySetMap[target]
-  }
-  
-  // For custom entities, typically add 's' to the end
-  if (target.includes('_')) {
-    return `${target}s`
-  }
-  
-  // Default fallback
-  return `${target}s`
-}
 
 /**
  * Check if a global option set constant is actually used in the entity
@@ -594,11 +585,19 @@ function checkIfConstantIsUsed(): boolean {
  */
 function generateExpandTypes(
   entityMetadata: ProcessedEntityMetadata,
-  options: TypeGenerationOptions = {}
-): string {
+  options: TypeGenerationOptions = {},
+  allEntities: ProcessedEntityMetadata[] = []
+): { expandTypes: string, relatedEntityImports: string[] } {
   const { includeComments = true } = options
   const lines: string[] = []
   const schemaName = entityMetadata.schemaName
+  const relatedEntityImports: string[] = []
+  
+  // Create lookup dictionary from actual metadata instead of hardcoded mapping
+  const entityLookup = new Map<string, ProcessedEntityMetadata>()
+  allEntities.forEach(entity => {
+    entityLookup.set(entity.logicalName, entity)
+  })
   
   if (includeComments) {
     lines.push(`/**`)
@@ -633,16 +632,57 @@ function generateExpandTypes(
   const expandTypeName = `${schemaName}Expand`
   lines.push(`export type ${expandTypeName} =`)
   lines.push(`  | ${expandablePropsTypeName}[]`) // Array format
-  lines.push(`  | {`) // Object format
-  lines.push(`      [K in ${expandablePropsTypeName}]?: {`)
-  lines.push(`        $select?: string[]`)
-  lines.push(`        $filter?: any`)
-  lines.push(`        $orderby?: any`)
-  lines.push(`        $top?: number`)
-  lines.push(`      }`)
-  lines.push(`    }`)
+  lines.push(`  | ${schemaName}TypeSafeExpand`) // Type-safe object format
+
+  lines.push('')
   
-  return lines.join('\n')
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Type-safe expand with target entity field awareness`)
+    lines.push(` * $select shows actual field names from target entities`)
+    lines.push(` */`)
+  }
+  
+  // Generate type-safe expand type that maps relationships to target entity types
+  lines.push(`export type ${schemaName}TypeSafeExpand = {`)
+  
+  // Generate type mappings for each relationship
+  if (Object.keys(entityMetadata.relatedEntities).length > 0) {
+    // Add imports for query types (only add once)
+    if (!relatedEntityImports.some(imp => imp.includes('ODataFilter'))) {
+      relatedEntityImports.push(`import type { ODataFilter, ODataOrderBy } from './query-types.js'`)
+    }
+    
+    Object.entries(entityMetadata.relatedEntities).forEach(([relationshipName, info]) => {
+      // Look up the actual schema name from the processed entities using our metadata lookup
+      const relatedEntity = entityLookup.get(info.targetEntityLogicalName)
+      if (!relatedEntity) {
+        throw new Error(`Entity metadata not found for target entity: ${info.targetEntityLogicalName}. This entity should be included in the allEntities array passed to generateExpandTypes.`)
+      }
+      const targetSchemaName = relatedEntity.schemaName
+      
+      // Add import for the target entity type (skip self-references)
+      if (info.targetEntityLogicalName !== entityMetadata.logicalName) {
+        // Use the actual filename (lowercase schema name) for the import path
+        const targetFileName = relatedEntity.schemaName.toLowerCase()
+        relatedEntityImports.push(`import type { ${targetSchemaName} } from './${targetFileName}.js'`)
+      }
+      
+      lines.push(`  "${relationshipName}"?: {`)
+      lines.push(`    $select?: (keyof ${targetSchemaName})[]`)
+      lines.push(`    $filter?: ODataFilter<${targetSchemaName}>`)
+      lines.push(`    $orderby?: ODataOrderBy<${targetSchemaName}>`)
+      lines.push(`    $top?: number`)
+      lines.push(`  }`)
+    })
+  }
+  
+  lines.push(`}`)
+  
+  return {
+    expandTypes: lines.join('\n'),
+    relatedEntityImports
+  }
 }
 
 /**
@@ -698,6 +738,7 @@ function generateOptionSetTypeName(optionSetName: string): string {
 function escapeString(str: string): string {
   return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')
 }
+
 
 /**
  * Generate TypeScript file for a global option set

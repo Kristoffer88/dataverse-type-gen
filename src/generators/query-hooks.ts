@@ -21,7 +21,7 @@ export function generateEntityHooks(
   const lines: string[] = []
   
   const interfaceName = entityMetadata.schemaName
-  const pascalTypeName = toPascalCaseTypeName(entityMetadata.schemaName)
+  const schemaTypeName = entityMetadata.schemaName
   const entitySetName = entityMetadata.entitySetName
   const primaryKey = entityMetadata.primaryIdAttribute
   
@@ -29,17 +29,14 @@ export function generateEntityHooks(
   lines.push(`import { useQuery } from '@tanstack/react-query'`)
   lines.push(`import type { UseQueryOptions, UseQueryResult } from '@tanstack/react-query'`)
   lines.push(`import { ${interfaceName}Metadata } from '../${entityMetadata.logicalName}.js'`)
-  lines.push(`import type { ${interfaceName} } from '../${entityMetadata.logicalName}.js'`)
+  lines.push(`import type { ${interfaceName}, ${interfaceName}Expand } from '../${entityMetadata.logicalName}.js'`)
   lines.push(`import type {`)
   lines.push(`    ODataFilter,`)
   lines.push(`    ODataSelect,`)
-  lines.push(`    ODataExpand,`)
   lines.push(`    ODataOrderBy,`)
-  lines.push(`    ODataResponse,`)
-  lines.push(`    EntityListOptions,`)
-  lines.push(`    EntityOptions`)
+  lines.push(`    ODataResponse`)
   lines.push(`} from '../query-types.js'`)
-  lines.push(`import { ${pascalTypeName}Queries } from '../queries/${entityMetadata.logicalName}.queries.js'`)
+  lines.push(`import { ${schemaTypeName}Queries } from '../queries/${entityMetadata.logicalName}.queries.js'`)
   
   // Import related entity types for type-safe expands (only if they exist)
   // NOTE: We skip generating imports for related entities that don't have type files
@@ -52,7 +49,7 @@ export function generateEntityHooks(
   
   /*
   for (const [, relatedInfo] of Object.entries(entityMetadata.relatedEntities)) {
-    const relatedTypeName = toPascalCaseTypeName(relatedInfo.targetEntityLogicalName)
+    const relatedTypeName = relatedInfo.targetEntityLogicalName
     relatedEntityImports.add(`import type { ${relatedTypeName} } from '../${relatedInfo.targetEntityLogicalName}.js'`)
   }
   */
@@ -83,7 +80,28 @@ export function generateEntityHooks(
   }
   lines.push(``)
   
-  // Types are imported from query-types.js - no need to redefine locally
+  // Custom types with entity-specific expand support
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Type-safe options for ${entityMetadata.displayName} entity operations`)
+    lines.push(` * Uses entity-specific expand types for full IntelliSense support`)
+    lines.push(` */`)
+  }
+  lines.push(`type ${interfaceName}ListOptions = {`)
+  lines.push(`  $select?: ODataSelect<${interfaceName}>`)
+  lines.push(`  $expand?: ${interfaceName}Expand`)
+  lines.push(`  $filter?: ODataFilter<${interfaceName}>`)
+  lines.push(`  $orderby?: ODataOrderBy<${interfaceName}>`)
+  lines.push(`  $top?: number`)
+  lines.push(`  $skip?: number`)
+  lines.push(`  $count?: boolean`)
+  lines.push(`  $search?: string`)
+  lines.push(`}`)
+  lines.push('')
+  lines.push(`type ${interfaceName}Options = {`)
+  lines.push(`  $select?: ODataSelect<${interfaceName}>`)
+  lines.push(`  $expand?: ${interfaceName}Expand`)
+  lines.push(`}`)
   
   // =====================================================================
   // React Query Hooks (using generated query builders)
@@ -91,19 +109,19 @@ export function generateEntityHooks(
   
   if (includeComments) {
     lines.push(`/**`)
-    lines.push(` * These hooks use the generated query builders from ${pascalTypeName}Queries.`)
+    lines.push(` * These hooks use the generated query builders from ${schemaTypeName}Queries.`)
     lines.push(` * You can modify the query building logic by editing the queries file.`)
     lines.push(` */`)
     lines.push(``)
   }
   
-  generateSingleEntityHook(lines, interfaceName, pascalTypeName, entitySetName, primaryKey, entityMetadata, includeComments)
+  generateSingleEntityHook(lines, interfaceName, schemaTypeName, entitySetName, primaryKey, entityMetadata, includeComments)
   lines.push('')
   
-  generateEntityListHook(lines, interfaceName, pascalTypeName, entitySetName, entityMetadata, includeComments)
+  generateEntityListHook(lines, interfaceName, schemaTypeName, entitySetName, entityMetadata, includeComments)
   lines.push('')
   
-  generateEntityCountHook(lines, interfaceName, pascalTypeName, entitySetName, entityMetadata, includeComments)
+  generateEntityCountHook(lines, interfaceName, schemaTypeName, entitySetName, entityMetadata, includeComments)
   lines.push('')
   
   // =====================================================================
@@ -115,20 +133,20 @@ export function generateEntityHooks(
     lines.push(` * Query keys for React Query cache management`)
     lines.push(` * `)
     lines.push(` * Use these to invalidate or prefetch specific queries:`)
-    lines.push(` * - \`queryClient.invalidateQueries(${pascalTypeName}QueryKeys.all)\` - Invalidate all queries`)
-    lines.push(` * - \`queryClient.invalidateQueries(${pascalTypeName}QueryKeys.detail(id))\` - Invalidate specific entity`)
-    lines.push(` * - \`queryClient.invalidateQueries(${pascalTypeName}QueryKeys.list())\` - Invalidate all lists`)
+    lines.push(` * - \`queryClient.invalidateQueries(${schemaTypeName}QueryKeys.all)\` - Invalidate all queries`)
+    lines.push(` * - \`queryClient.invalidateQueries(${schemaTypeName}QueryKeys.detail(id))\` - Invalidate specific entity`)
+    lines.push(` * - \`queryClient.invalidateQueries(${schemaTypeName}QueryKeys.list())\` - Invalidate all lists`)
     lines.push(` */`)
   }
-  lines.push(`export const ${pascalTypeName}QueryKeys = {`)
+  lines.push(`export const ${schemaTypeName}QueryKeys = {`)
   lines.push(`  /** Base key for all ${entityMetadata.displayName} queries */`)
   lines.push(`  all: ['${entityMetadata.logicalName}'] as const,`)
   lines.push(`  /** Key for single entity queries */`)
-  lines.push(`  detail: (id: string) => [...${pascalTypeName}QueryKeys.all, 'detail', id] as const,`)
+  lines.push(`  detail: (id: string) => [...${schemaTypeName}QueryKeys.all, 'detail', id] as const,`)
   lines.push(`  /** Key for entity list queries */`)
-  lines.push(`  list: (options?: EntityListOptions<${interfaceName}, typeof ${interfaceName}Metadata>) => [...${pascalTypeName}QueryKeys.all, 'list', options] as const,`)
+  lines.push(`  list: (options?: ${interfaceName}ListOptions) => [...${schemaTypeName}QueryKeys.all, 'list', options] as const,`)
   lines.push(`  /** Key for entity count queries */`)
-  lines.push(`  count: (options?: EntityListOptions<${interfaceName}, typeof ${interfaceName}Metadata>) => [...${pascalTypeName}QueryKeys.all, 'count', options] as const,`)
+  lines.push(`  count: (options?: Pick<${interfaceName}ListOptions, '$filter'>) => [...${schemaTypeName}QueryKeys.all, 'count', options] as const,`)
   lines.push(`}`)
   
   return lines.join('\n')
@@ -140,7 +158,7 @@ export function generateEntityHooks(
 function generateSingleEntityHook(
   lines: string[],
   interfaceName: string,
-  pascalTypeName: string,
+  schemaTypeName: string,
   entitySetName: string,
   primaryKey: string,
   entityMetadata: ProcessedEntityMetadata,
@@ -157,11 +175,11 @@ function generateSingleEntityHook(
     lines.push(` * `)
     lines.push(` * @example`)
     lines.push(` * // Basic usage`)
-    lines.push(` * const { data, isLoading, error } = use${pascalTypeName}(entityId)`)
+    lines.push(` * const { data, isLoading, error } = use${schemaTypeName}(entityId)`)
     lines.push(` * `)
     lines.push(` * @example`)
     lines.push(` * // With field selection and error handling`)
-    lines.push(` * const { data: ${entityMetadata.logicalName.toLowerCase()}, isLoading } = use${pascalTypeName}(`)
+    lines.push(` * const { data: ${entityMetadata.logicalName.toLowerCase()}, isLoading } = use${schemaTypeName}(`)
     lines.push(` *   '123e4567-e89b-12d3-a456-426614174000',`)
     lines.push(` *   { `)
     lines.push(` *     $select: ['${entityMetadata.primaryNameAttribute}', '${entityMetadata.attributes.find(a => a.logicalName !== entityMetadata.primaryNameAttribute)?.logicalName || 'createdon'}'],`)
@@ -171,18 +189,18 @@ function generateSingleEntityHook(
     lines.push(` */`)
   }
   
-  lines.push(`export function use${pascalTypeName}(`)
+  lines.push(`export function use${schemaTypeName}(`)
   lines.push(`    id: string | undefined,`)
-  lines.push(`    options: EntityOptions<${interfaceName}, typeof ${interfaceName}Metadata> & Omit<UseQueryOptions<${interfaceName}>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`    options: ${interfaceName}Options & Omit<UseQueryOptions<${interfaceName}>, 'queryKey' | 'queryFn'> = {}`)
   lines.push(`): UseQueryResult<${interfaceName}> {`)
   lines.push(`  const { $select, $expand, ...queryOptions } = options`)
   lines.push(`  `)
   lines.push(`  return useQuery({`)
-  lines.push(`    queryKey: ${pascalTypeName}QueryKeys.detail(id || ''),`)
+  lines.push(`    queryKey: ${schemaTypeName}QueryKeys.detail(id || ''),`)
   lines.push(`    queryFn: async (): Promise<${interfaceName}> => {`)
   lines.push(`      if (!id) throw new Error('ID is required')`)
   lines.push(`      `)
-  lines.push(`      const url = ${pascalTypeName}Queries.buildEntityUrl(id, { $select, $expand })`)
+  lines.push(`      const url = ${schemaTypeName}Queries.buildEntityUrl(id, { $select, $expand })`)
   lines.push(`      const response = await fetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
@@ -203,7 +221,7 @@ function generateSingleEntityHook(
 function generateEntityListHook(
   lines: string[],
   interfaceName: string,
-  pascalTypeName: string,
+  schemaTypeName: string,
   entitySetName: string,
   entityMetadata: ProcessedEntityMetadata,
   includeComments: boolean
@@ -226,11 +244,11 @@ function generateEntityListHook(
     lines.push(` * `)
     lines.push(` * @example`)
     lines.push(` * // Basic list`)
-    lines.push(` * const { data } = use${pascalTypeName}List()`)
+    lines.push(` * const { data } = use${schemaTypeName}List()`)
     lines.push(` * `)
     lines.push(` * @example`)
     lines.push(` * // Advanced filtering with type safety`)
-    lines.push(` * const { data: ${entityMetadata.logicalName.toLowerCase()}s } = use${pascalTypeName}List({`)
+    lines.push(` * const { data: ${entityMetadata.logicalName.toLowerCase()}s } = use${schemaTypeName}List({`)
     lines.push(` *   $filter: { `)
     lines.push(` *     statecode: ${stateExample},`)
     lines.push(` *     ${entityMetadata.primaryNameAttribute}: { $contains: 'important' },`)
@@ -245,15 +263,15 @@ function generateEntityListHook(
     lines.push(` */`)
   }
   
-  lines.push(`export function use${pascalTypeName}List(`)
-  lines.push(`    options: EntityListOptions<${interfaceName}, typeof ${interfaceName}Metadata> & Omit<UseQueryOptions<ODataResponse<${interfaceName}>>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`export function use${schemaTypeName}List(`)
+  lines.push(`    options: ${interfaceName}ListOptions & Omit<UseQueryOptions<ODataResponse<${interfaceName}>>, 'queryKey' | 'queryFn'> = {}`)
   lines.push(`): UseQueryResult<ODataResponse<${interfaceName}>> {`)
   lines.push(`  const { $filter, $select, $expand, $orderby, $top, $skip, ...queryOptions } = options`)
   lines.push(`  `)
   lines.push(`  return useQuery({`)
-  lines.push(`    queryKey: ${pascalTypeName}QueryKeys.list({ $filter, $select, $expand, $orderby, $top, $skip }),`)
+  lines.push(`    queryKey: ${schemaTypeName}QueryKeys.list({ $filter, $select, $expand, $orderby, $top, $skip }),`)
   lines.push(`    queryFn: async (): Promise<ODataResponse<${interfaceName}>> => {`)
-  lines.push(`      const url = ${pascalTypeName}Queries.buildListUrl({ $filter, $select, $expand, $orderby, $top, $skip })`)
+  lines.push(`      const url = ${schemaTypeName}Queries.buildListUrl({ $filter, $select, $expand, $orderby, $top, $skip })`)
   lines.push(`      const response = await fetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
@@ -273,7 +291,7 @@ function generateEntityListHook(
 function generateEntityCountHook(
   lines: string[],
   interfaceName: string,
-  pascalTypeName: string,
+  schemaTypeName: string,
   entitySetName: string,
   entityMetadata: ProcessedEntityMetadata,
   includeComments: boolean
@@ -285,21 +303,21 @@ function generateEntityCountHook(
     lines.push(` * @param options - Filter options to count specific entities`)
     lines.push(` * `)
     lines.push(` * @example`)
-    lines.push(` * const { data: count } = use${pascalTypeName}Count({`)
+    lines.push(` * const { data: count } = use${schemaTypeName}Count({`)
     lines.push(` *   $filter: { statecode: 0 }`)
     lines.push(` * })`)
     lines.push(` */`)
   }
   
-  lines.push(`export function use${pascalTypeName}Count(`)
-  lines.push(`    options: Pick<EntityListOptions<${interfaceName}, typeof ${interfaceName}Metadata>, '$filter'> & Omit<UseQueryOptions<number>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`export function use${schemaTypeName}Count(`)
+  lines.push(`    options: Pick<${interfaceName}ListOptions, '$filter'> & Omit<UseQueryOptions<number>, 'queryKey' | 'queryFn'> = {}`)
   lines.push(`): UseQueryResult<number> {`)
   lines.push(`  const { $filter, ...queryOptions } = options`)
   lines.push(`  `)
   lines.push(`  return useQuery({`)
-  lines.push(`    queryKey: ${pascalTypeName}QueryKeys.count({ $filter }),`)
+  lines.push(`    queryKey: ${schemaTypeName}QueryKeys.count({ $filter }),`)
   lines.push(`    queryFn: async (): Promise<number> => {`)
-  lines.push(`      const url = ${pascalTypeName}Queries.buildCountUrl({ $filter })`)
+  lines.push(`      const url = ${schemaTypeName}Queries.buildCountUrl({ $filter })`)
   lines.push(`      const response = await fetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
@@ -324,7 +342,7 @@ export function generateEntityQueryBuilders(
   const { includeComments = true } = options
   const lines: string[] = []
   const interfaceName = entityMetadata.schemaName
-  const pascalTypeName = toPascalCaseTypeName(entityMetadata.schemaName)
+  const schemaTypeName = entityMetadata.schemaName
   const entitySetName = entityMetadata.entitySetName
   
   // File header
@@ -367,7 +385,7 @@ export function generateEntityQueryBuilders(
     lines.push(` * All functions are pure and return URL strings that you can inspect and customize.`)
     lines.push(` */`)
   }
-  lines.push(`export const ${pascalTypeName}Queries = {`)
+  lines.push(`export const ${schemaTypeName}Queries = {`)
   lines.push(`  /**`)
   lines.push(`   * Build URL for fetching a single ${entityMetadata.displayName} by ID`)
   lines.push(`   */`)
@@ -815,16 +833,6 @@ export function generateHooksDocumentation(
  * Utility functions
  */
 
-function toPascalCaseTypeName(schemaName: string): string {
-  if (schemaName.includes('_')) {
-    const parts = schemaName.split('_')
-    return parts.map(part => 
-      part.charAt(0).toUpperCase() + part.slice(1)
-    ).join('')
-  }
-  
-  return schemaName.charAt(0).toUpperCase() + schemaName.slice(1)
-}
 
 function generateSampleGuid(): string {
   return '123e4567-e89b-12d3-a456-426614174000'

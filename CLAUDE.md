@@ -22,7 +22,7 @@ The generator transforms EntityMetadata, AttributeMetadata, and OptionSetMetadat
 
 **Environment Setup:**
 ```bash
-export DATAVERSE_INSTANCE=https://krapowerppm.crm4.dynamics.com
+export DATAVERSE_INSTANCE=https://ssopowerppm.crm4.dynamics.com
 ```
 
 **Generate Types Command:**
