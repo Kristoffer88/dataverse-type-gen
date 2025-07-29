@@ -31,6 +31,9 @@ export interface DataverseTypeGenConfig {
   /** Maximum depth for related entity generation (prevents infinite recursion) */
   maxRelatedEntityDepth?: number
   
+  /** Directory name for related entities (default: "related") */
+  relatedEntitiesDir?: string
+  
   /** Generate ALL entities from Dataverse for complete type safety (replaces generateRelatedEntities) */
   nestedExpand?: boolean
   
@@ -65,6 +68,7 @@ export const DEFAULT_CONFIG: DataverseTypeGenConfig = {
   fileExtension: '.ts',
   generateRelatedEntities: true, // Enable type-safe nested expands by default
   maxRelatedEntityDepth: 2, // Prevent infinite recursion while allowing reasonable nesting
+  relatedEntitiesDir: 'related', // Default subdirectory for related entities
   nestedExpand: false, // Default to false for backward compatibility
   typeGeneration: {
     includeComments: true,
@@ -320,6 +324,8 @@ export function toCodeGenConfig(config: DataverseTypeGenConfig): CodeGenConfig {
     eslint: false, // Default to no eslint
     overwrite: true, // Default to overwrite
     generateHooks: config.typeGeneration.generateHooks ?? true,
+    relatedEntitiesDir: config.relatedEntitiesDir,
+    primaryEntities: config.entities || [],
     typeGenerationOptions: {
       entityPrefix: config.typeGeneration.entityPrefix,
       includeComments: config.typeGeneration.includeComments,
@@ -330,6 +336,8 @@ export function toCodeGenConfig(config: DataverseTypeGenConfig): CodeGenConfig {
       includeBindingTypes: config.typeGeneration.includeBindingTypes,
       excludeAuxiliaryAttributes: config.typeGeneration.excludeAuxiliaryAttributes,
       nestedExpand: config.nestedExpand,
+      primaryEntities: config.entities || [],
+      relatedEntitiesDir: config.relatedEntitiesDir,
     }
   }
 }

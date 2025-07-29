@@ -18,6 +18,8 @@ export interface CodeGenConfig {
   eslint: boolean
   overwrite: boolean
   generateHooks: boolean
+  relatedEntitiesDir?: string
+  primaryEntities?: string[]
   typeGenerationOptions: TypeGenerationOptions
 }
 
@@ -56,12 +58,35 @@ const DEFAULT_CONFIG: CodeGenConfig = {
   eslint: false,
   overwrite: true,
   generateHooks: true,
+  relatedEntitiesDir: 'related',
+  primaryEntities: [],
   typeGenerationOptions: {
     includeComments: true,
     includeValidation: true,
     includeMetadata: true,
     useExactTypes: true
   }
+}
+
+/**
+ * Helper function to determine if an entity is a primary entity
+ */
+function isPrimaryEntity(entityLogicalName: string, primaryEntities: string[] = []): boolean {
+  return primaryEntities.includes(entityLogicalName)
+}
+
+/**
+ * Helper function to get the correct directory path for an entity
+ */
+function getEntityDirectory(entityLogicalName: string, config: CodeGenConfig): string {
+  // Check if directory organization should be enabled
+  const shouldOrganizeDirectories = config.relatedEntitiesDir && 
+    (config.typeGenerationOptions.nestedExpand || config.primaryEntities?.length);
+  
+  if (!shouldOrganizeDirectories || isPrimaryEntity(entityLogicalName, config.primaryEntities)) {
+    return config.outputDir // Primary entities go in root
+  }
+  return join(config.outputDir, config.relatedEntitiesDir!) // Related entities go in subdirectory
 }
 
 /**
@@ -144,9 +169,18 @@ export async function writeEntityHooksFile(
       ? await formatCode(content)
       : content
 
-    // Determine file path - hooks files go in a hooks subdirectory
+    // Determine file path - hooks files go in hooks subdirectory with related entities in hooks/related
     const fileName = `${entityMetadata.logicalName}.hooks${finalConfig.fileExtension}`
-    const filePath = join(finalConfig.outputDir, 'hooks', fileName)
+    const hooksBaseDir = join(finalConfig.outputDir, 'hooks')
+    
+    // Check if directory organization should be enabled
+    const shouldOrganizeDirectories = finalConfig.relatedEntitiesDir && 
+      (finalConfig.typeGenerationOptions.nestedExpand || finalConfig.primaryEntities?.length);
+    
+    const hooksDir = !shouldOrganizeDirectories || isPrimaryEntity(entityMetadata.logicalName, finalConfig.primaryEntities) 
+      ? hooksBaseDir 
+      : join(hooksBaseDir, finalConfig.relatedEntitiesDir || 'related')
+    const filePath = join(hooksDir, fileName)
 
     // Ensure output directory exists
     await fs.mkdir(dirname(filePath), { recursive: true })
@@ -178,8 +212,17 @@ export async function writeEntityHooksFile(
     }
 
   } catch (error) {
+    const hooksBaseDir = join(finalConfig.outputDir, 'hooks')
+    
+    // Check if directory organization should be enabled
+    const shouldOrganizeDirectories = finalConfig.relatedEntitiesDir && 
+      (finalConfig.typeGenerationOptions.nestedExpand || finalConfig.primaryEntities?.length);
+    
+    const hooksDir = !shouldOrganizeDirectories || isPrimaryEntity(entityMetadata.logicalName, finalConfig.primaryEntities) 
+      ? hooksBaseDir 
+      : join(hooksBaseDir, finalConfig.relatedEntitiesDir || 'related')
     return {
-      filePath: join(finalConfig.outputDir, 'hooks', `${entityMetadata.logicalName}.hooks${finalConfig.fileExtension}`),
+      filePath: join(hooksDir, `${entityMetadata.logicalName}.hooks${finalConfig.fileExtension}`),
       content: '',
       size: 0,
       success: false,
@@ -207,9 +250,18 @@ export async function writeEntityQueryBuildersFile(
       ? await formatCode(content)
       : content
 
-    // Determine file path - query builders files go in a queries subdirectory
+    // Determine file path - query builders files go in queries subdirectory with related entities in queries/related
     const fileName = `${entityMetadata.logicalName}.queries${finalConfig.fileExtension}`
-    const filePath = join(finalConfig.outputDir, 'queries', fileName)
+    const queriesBaseDir = join(finalConfig.outputDir, 'queries')
+    
+    // Check if directory organization should be enabled
+    const shouldOrganizeDirectories = finalConfig.relatedEntitiesDir && 
+      (finalConfig.typeGenerationOptions.nestedExpand || finalConfig.primaryEntities?.length);
+    
+    const queriesDir = !shouldOrganizeDirectories || isPrimaryEntity(entityMetadata.logicalName, finalConfig.primaryEntities) 
+      ? queriesBaseDir 
+      : join(queriesBaseDir, finalConfig.relatedEntitiesDir || 'related')
+    const filePath = join(queriesDir, fileName)
 
     // Ensure output directory exists
     await fs.mkdir(dirname(filePath), { recursive: true })
@@ -241,8 +293,17 @@ export async function writeEntityQueryBuildersFile(
     }
 
   } catch (error) {
+    const queriesBaseDir = join(finalConfig.outputDir, 'queries')
+    
+    // Check if directory organization should be enabled
+    const shouldOrganizeDirectories = finalConfig.relatedEntitiesDir && 
+      (finalConfig.typeGenerationOptions.nestedExpand || finalConfig.primaryEntities?.length);
+    
+    const queriesDir = !shouldOrganizeDirectories || isPrimaryEntity(entityMetadata.logicalName, finalConfig.primaryEntities) 
+      ? queriesBaseDir 
+      : join(queriesBaseDir, finalConfig.relatedEntitiesDir || 'related')
     return {
-      filePath: join(finalConfig.outputDir, 'queries', `${entityMetadata.logicalName}.queries${finalConfig.fileExtension}`),
+      filePath: join(queriesDir, `${entityMetadata.logicalName}.queries${finalConfig.fileExtension}`),
       content: '',
       size: 0,
       success: false,
@@ -273,9 +334,10 @@ export async function writeEntityTypeDeclaration(
       ? await formatCode(content)
       : content
 
-    // Determine file path
+    // Determine file path - primary entities in root, related entities in subdirectory
     const fileName = `${entityMetadata.schemaName.toLowerCase()}${finalConfig.fileExtension}`
-    const filePath = join(finalConfig.outputDir, fileName)
+    const entityDir = getEntityDirectory(entityMetadata.logicalName, finalConfig)
+    const filePath = join(entityDir, fileName)
 
     // Ensure output directory exists
     await fs.mkdir(dirname(filePath), { recursive: true })
@@ -307,8 +369,9 @@ export async function writeEntityTypeDeclaration(
     }
 
   } catch (error) {
+    const entityDir = getEntityDirectory(entityMetadata.logicalName, finalConfig)
     return {
-      filePath: join(finalConfig.outputDir, `${entityMetadata.schemaName.toLowerCase()}${finalConfig.fileExtension}`),
+      filePath: join(entityDir, `${entityMetadata.schemaName.toLowerCase()}${finalConfig.fileExtension}`),
       content: '',
       size: 0,
       success: false,

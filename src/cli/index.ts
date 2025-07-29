@@ -488,7 +488,12 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
         }
         
         try {
-          const processed = processEntityMetadata(entityMetadata)
+          // Apply special configuration for systemuser to exclude system audit relationships
+          const processingOptions = entityMetadata.LogicalName === 'systemuser' 
+            ? { excludeSystemAuditRelationships: true }
+            : undefined
+          
+          const processed = processEntityMetadata(entityMetadata, processingOptions)
           allEntitiesForLookup.push(processed)
           
           // Keep track of primary entities (the ones user specifically requested)
@@ -520,7 +525,12 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
           })
           
           if (rawMetadata) {
-            const processed = processEntityMetadata(rawMetadata)
+            // Apply special configuration for systemuser to exclude system audit relationships
+            const processingOptions = rawMetadata.LogicalName === 'systemuser' 
+              ? { excludeSystemAuditRelationships: true }
+              : undefined
+            
+            const processed = processEntityMetadata(rawMetadata, processingOptions)
             processedEntities.push(processed)
             logger.verboseDebug(`✅ Processed ${entityName} (${processed.attributes.length} attributes)`)
           } else {
@@ -570,7 +580,12 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
               })
               
               if (rawMetadata) {
-                const processed = processEntityMetadata(rawMetadata)
+                // Apply special configuration for systemuser to exclude system audit relationships
+                const processingOptions = rawMetadata.LogicalName === 'systemuser' 
+                  ? { excludeSystemAuditRelationships: true }
+                  : undefined
+                
+                const processed = processEntityMetadata(rawMetadata, processingOptions)
                 allEntitiesForLookup.push(processed)
                 logger.verboseDebug(`✅ Processed related entity ${entityName} (${processed.attributes.length} attributes)`)
               } else {

@@ -179,7 +179,7 @@ function extractRequiredLevel(requiredLevel?: { Value: string }): 'None' | 'Syst
 /**
  * Process entity metadata for type generation
  */
-export function processEntityMetadata(entityMetadata: EntityDefinition): ProcessedEntityMetadata {
+export function processEntityMetadata(entityMetadata: EntityDefinition, options?: { excludeSystemAuditRelationships?: boolean }): ProcessedEntityMetadata {
   const processed: ProcessedEntityMetadata = {
     logicalName: entityMetadata.LogicalName,
     schemaName: entityMetadata.SchemaName,
@@ -260,7 +260,7 @@ export function processEntityMetadata(entityMetadata: EntityDefinition): Process
   }
   
   // Build related entities info from relationships and lookup attributes
-  processed.relatedEntities = buildRelatedEntitiesInfo(processed)
+  processed.relatedEntities = buildRelatedEntitiesInfo(processed, options?.excludeSystemAuditRelationships)
   
   return processed
 }
@@ -268,14 +268,34 @@ export function processEntityMetadata(entityMetadata: EntityDefinition): Process
 /**
  * Build related entities information for type-safe expands
  */
-function buildRelatedEntitiesInfo(primaryEntity: ProcessedEntityMetadata): Record<string, RelatedEntityInfo> {
+function buildRelatedEntitiesInfo(primaryEntity: ProcessedEntityMetadata, excludeSystemAuditRelationships = false): Record<string, RelatedEntityInfo> {
   const relatedEntities: Record<string, RelatedEntityInfo> = {}
+
+  // System audit relationship patterns to exclude for systemuser
+  const systemAuditPatterns = [
+    /^lk_.*_createdby$/,
+    /^lk_.*_modifiedby$/,
+    /^lk_.*_createdonbehalfby$/,
+    /^lk_.*_modifiedonbehalfby$/,
+    /^user_.*$/,
+    /^systemuser_.*$/,
+    /^createdby_.*$/,
+    /^modifiedby_.*$/,
+    /^createdonbehalfby_.*$/,
+    /^modifiedonbehalfby_.*$/
+  ]
 
   // Process lookup attributes (many-to-one relationships)
   for (const attr of primaryEntity.attributes) {
     if (attr.attributeType === 'Lookup' && attr.targets) {
       for (const targetEntity of attr.targets) {
         const relationshipName = attr.logicalName.replace(/_value$/, '')
+        
+        // Skip if this is a duplicate key
+        if (relatedEntities[relationshipName]) {
+          continue
+        }
+        
         relatedEntities[relationshipName] = {
           relationshipName,
           targetEntityLogicalName: targetEntity,
@@ -288,6 +308,21 @@ function buildRelatedEntitiesInfo(primaryEntity: ProcessedEntityMetadata): Recor
 
   // Process one-to-many relationships
   for (const rel of primaryEntity.oneToManyRelationships) {
+    // Skip system audit relationships if configured
+    if (excludeSystemAuditRelationships && primaryEntity.logicalName === 'systemuser') {
+      const isSystemAuditRelationship = systemAuditPatterns.some(pattern => 
+        pattern.test(rel.schemaName)
+      )
+      if (isSystemAuditRelationship) {
+        continue
+      }
+    }
+    
+    // Skip if this is a duplicate key
+    if (relatedEntities[rel.schemaName]) {
+      continue
+    }
+    
     relatedEntities[rel.schemaName] = {
       relationshipName: rel.schemaName,
       targetEntityLogicalName: rel.referencingEntity,
@@ -302,6 +337,11 @@ function buildRelatedEntitiesInfo(primaryEntity: ProcessedEntityMetadata): Recor
     const targetEntity = rel.entity1LogicalName === primaryEntity.logicalName 
       ? rel.entity2LogicalName 
       : rel.entity1LogicalName
+    
+    // Skip if this is a duplicate key
+    if (relatedEntities[rel.schemaName]) {
+      continue
+    }
     
     relatedEntities[rel.schemaName] = {
       relationshipName: rel.schemaName,

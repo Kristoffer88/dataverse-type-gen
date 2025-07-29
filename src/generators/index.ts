@@ -17,6 +17,10 @@ export interface TypeGenerationOptions {
   includeBindingTypes?: boolean
   excludeAuxiliaryAttributes?: boolean
   nestedExpand?: boolean
+  excludeSystemAuditRelationships?: boolean
+  // Directory structure options
+  primaryEntities?: string[]
+  relatedEntitiesDir?: string
 }
 
 /**
@@ -44,7 +48,7 @@ export function generateEntityInterface(
     excludeAuxiliaryAttributes = true
   } = options
 
-  const interfaceName = `${entityPrefix}${entityMetadata.schemaName}`
+  const interfaceName = `${entityPrefix}${sanitizeInterfaceName(entityMetadata.schemaName)}`
   const lines: string[] = []
 
   // Add interface comment
@@ -255,7 +259,7 @@ export function generateMetadataObject(
     includeComments = true
   } = options
 
-  const interfaceName = `${entityPrefix}${entityMetadata.schemaName}`
+  const interfaceName = `${entityPrefix}${sanitizeInterfaceName(entityMetadata.schemaName)}`
   const metadataName = `${interfaceName}Metadata`
   const lines: string[] = []
 
@@ -479,7 +483,7 @@ function generateBindingTypes(
   }
 
   const lines: string[] = []
-  const schemaTypeName = entityMetadata.schemaName
+  const schemaTypeName = sanitizeInterfaceName(entityMetadata.schemaName)
   
   if (includeComments) {
     lines.push(`/**`)
@@ -598,7 +602,7 @@ function generateExpandTypes(
 ): { expandTypes: string, relatedEntityImports: string[] } {
   const { includeComments = true, nestedExpand = false } = options
   const lines: string[] = []
-  const schemaName = entityMetadata.schemaName
+  const schemaName = sanitizeInterfaceName(entityMetadata.schemaName)
   const relatedEntityImports: string[] = []
   
   // Create lookup dictionary from actual metadata instead of hardcoded mapping
@@ -670,7 +674,7 @@ function generateExpandTypes(
         if (!relatedEntity) {
           throw new Error(`Entity metadata not found for target entity: ${info.targetEntityLogicalName}. This entity should be included in the allEntities array passed to generateExpandTypes.`)
         }
-        const targetSchemaName = relatedEntity.schemaName
+        const targetSchemaName = sanitizeInterfaceName(relatedEntity.schemaName)
         
         // Add import for the target entity type (skip self-references)
         if (info.targetEntityLogicalName !== entityMetadata.logicalName) {
@@ -722,7 +726,43 @@ function sanitizePropertyName(name: string): string {
     sanitized = `_${sanitized}`
   }
   
+  // Handle reserved keywords
+  if (isReservedKeyword(sanitized)) {
+    sanitized = `${sanitized}_`
+  }
+  
   return sanitized
+}
+
+function sanitizeInterfaceName(name: string): string {
+  // Ensure interface name is a valid JavaScript identifier
+  let sanitized = name.replace(/[^a-zA-Z0-9_$]/g, '_')
+  
+  // Ensure it doesn't start with a number
+  if (/^[0-9]/.test(sanitized)) {
+    sanitized = `_${sanitized}`
+  }
+  
+  // Handle reserved keywords by capitalizing the first letter
+  if (isReservedKeyword(sanitized)) {
+    sanitized = sanitized.charAt(0).toUpperCase() + sanitized.slice(1)
+  }
+  
+  return sanitized
+}
+
+function isReservedKeyword(name: string): boolean {
+  const reservedKeywords = [
+    'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do',
+    'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import',
+    'in', 'instanceof', 'new', 'null', 'return', 'super', 'switch', 'this', 'throw', 'true',
+    'try', 'typeof', 'var', 'void', 'while', 'with', 'yield', 'let', 'static', 'implements',
+    'interface', 'package', 'private', 'protected', 'public', 'abstract', 'as', 'any', 'boolean',
+    'number', 'string', 'symbol', 'type', 'from', 'of', 'readonly', 'keyof', 'infer', 'never',
+    'unknown', 'object', 'undefined'
+  ]
+  
+  return reservedKeywords.includes(name.toLowerCase())
 }
 
 function sanitizeOptionName(label: string): string {

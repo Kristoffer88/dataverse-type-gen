@@ -10,6 +10,33 @@ import type {
 import type { TypeGenerationOptions } from './index.js'
 
 /**
+ * Helper to determine the correct import path based on directory structure
+ */
+function getEntityImportPath(
+  fromEntityLogicalName: string,
+  toEntityLogicalName: string,
+  primaryEntities: string[] = [],
+  relatedEntitiesDir: string = 'related'
+): string {
+  const fromIsPrimary = primaryEntities.includes(fromEntityLogicalName)
+  const toIsPrimary = primaryEntities.includes(toEntityLogicalName)
+  
+  if (fromIsPrimary && toIsPrimary) {
+    // Both primary: ../entity
+    return `../${toEntityLogicalName}.js`
+  } else if (fromIsPrimary && !toIsPrimary) {
+    // From primary to related: ../related/entity
+    return `../${relatedEntitiesDir}/${toEntityLogicalName}.js`
+  } else if (!fromIsPrimary && toIsPrimary) {
+    // From related to primary: ../../entity
+    return `../../${toEntityLogicalName}.js`
+  } else {
+    // Both related: ../entity
+    return `../${toEntityLogicalName}.js`
+  }
+}
+
+/**
  * Generate individual, composable React Query hooks for an entity
  * Each hook is standalone and can be easily customized by developers
  */
@@ -17,7 +44,11 @@ export function generateEntityHooks(
   entityMetadata: ProcessedEntityMetadata,
   options: TypeGenerationOptions = {}
 ): string {
-  const { includeComments = true } = options
+  const { 
+    includeComments = true,
+    primaryEntities = [],
+    relatedEntitiesDir = 'related'
+  } = options
   const lines: string[] = []
   
   const interfaceName = entityMetadata.schemaName
@@ -25,18 +56,29 @@ export function generateEntityHooks(
   const entitySetName = entityMetadata.entitySetName
   const primaryKey = entityMetadata.primaryIdAttribute
   
+  // Determine import paths based on directory structure
+  const entityImportPath = getEntityImportPath(entityMetadata.logicalName, entityMetadata.logicalName, primaryEntities, relatedEntitiesDir)
+  const queryTypesImportPath = primaryEntities.includes(entityMetadata.logicalName) ? '../query-types.js' : '../../query-types.js'
+  
   // Import statements
   lines.push(`import { useQuery } from '@tanstack/react-query'`)
   lines.push(`import type { UseQueryOptions, UseQueryResult } from '@tanstack/react-query'`)
-  lines.push(`import { ${interfaceName}Metadata } from '../${entityMetadata.logicalName}.js'`)
-  lines.push(`import type { ${interfaceName}, ${interfaceName}Expand } from '../${entityMetadata.logicalName}.js'`)
+  lines.push(`import { ${entityMetadata.logicalName}Metadata } from '${entityImportPath}'`)
+  lines.push(`import type { ${interfaceName}, ${interfaceName}Expand } from '${entityImportPath}'`)
   lines.push(`import type {`)
   lines.push(`    ODataFilter,`)
   lines.push(`    ODataSelect,`)
   lines.push(`    ODataOrderBy,`)
   lines.push(`    ODataResponse`)
-  lines.push(`} from '../query-types.js'`)
-  lines.push(`import { ${schemaTypeName}Queries } from '../queries/${entityMetadata.logicalName}.queries.js'`)
+  lines.push(`} from '${queryTypesImportPath}'`)
+  
+  // Query builders import path (from hooks to queries directory)
+  // Both hooks and queries follow the same directory structure, so we can use relative paths within each
+  const isPrimary = primaryEntities.includes(entityMetadata.logicalName)
+  const queryBuildersImportPath = isPrimary 
+    ? `../queries/${entityMetadata.logicalName}.queries.js`    // hooks/entity.hooks.ts → queries/entity.queries.ts
+    : `../${entityMetadata.logicalName}.queries.js`             // hooks/related/entity.hooks.ts → queries/related/entity.queries.ts
+  lines.push(`import { ${entityMetadata.logicalName}Queries } from '${queryBuildersImportPath}'`)
   
   // Import related entity types for type-safe expands (only if they exist)
   // NOTE: We skip generating imports for related entities that don't have type files
@@ -109,7 +151,7 @@ export function generateEntityHooks(
   
   if (includeComments) {
     lines.push(`/**`)
-    lines.push(` * These hooks use the generated query builders from ${schemaTypeName}Queries.`)
+    lines.push(` * These hooks use the generated query builders from ${entityMetadata.logicalName}Queries.`)
     lines.push(` * You can modify the query building logic by editing the queries file.`)
     lines.push(` */`)
     lines.push(``)
@@ -200,7 +242,7 @@ function generateSingleEntityHook(
   lines.push(`    queryFn: async (): Promise<${interfaceName}> => {`)
   lines.push(`      if (!id) throw new Error('ID is required')`)
   lines.push(`      `)
-  lines.push(`      const url = ${schemaTypeName}Queries.buildEntityUrl(id, { $select, $expand })`)
+  lines.push(`      const url = ${entityMetadata.logicalName}Queries.buildEntityUrl(id, { $select, $expand })`)
   lines.push(`      const response = await fetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
@@ -271,7 +313,7 @@ function generateEntityListHook(
   lines.push(`  return useQuery({`)
   lines.push(`    queryKey: ${schemaTypeName}QueryKeys.list({ $filter, $select, $expand, $orderby, $top, $skip }),`)
   lines.push(`    queryFn: async (): Promise<ODataResponse<${interfaceName}>> => {`)
-  lines.push(`      const url = ${schemaTypeName}Queries.buildListUrl({ $filter, $select, $expand, $orderby, $top, $skip })`)
+  lines.push(`      const url = ${entityMetadata.logicalName}Queries.buildListUrl({ $filter, $select, $expand, $orderby, $top, $skip })`)
   lines.push(`      const response = await fetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
@@ -317,7 +359,7 @@ function generateEntityCountHook(
   lines.push(`  return useQuery({`)
   lines.push(`    queryKey: ${schemaTypeName}QueryKeys.count({ $filter }),`)
   lines.push(`    queryFn: async (): Promise<number> => {`)
-  lines.push(`      const url = ${schemaTypeName}Queries.buildCountUrl({ $filter })`)
+  lines.push(`      const url = ${entityMetadata.logicalName}Queries.buildCountUrl({ $filter })`)
   lines.push(`      const response = await fetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
@@ -361,8 +403,23 @@ export function generateEntityQueryBuilders(
   lines.push('')
   
   // Import types and metadata
-  lines.push(`import { ${interfaceName}Metadata } from '../${entityMetadata.logicalName}.js'`)
-  lines.push(`import type { ${interfaceName} } from '../${entityMetadata.logicalName}.js'`)
+  const metadataImportPath = getEntityImportPath(
+    entityMetadata.logicalName,
+    entityMetadata.logicalName,
+    options.primaryEntities || [],
+    options.relatedEntitiesDir || 'related'
+  ).replace('.js', '.js') // Entity imports self for metadata and interface
+  
+  // Correct path for queries directory structure
+  // Primary entities: queries/entity.queries.ts → ../entity.js
+  // Related entities: queries/related/entity.queries.ts → ../../related/entity.js
+  const isPrimary = (options.primaryEntities || []).includes(entityMetadata.logicalName)
+  const entityImportPath = isPrimary 
+    ? `../${entityMetadata.logicalName}.js`
+    : `../../related/${entityMetadata.logicalName}.js`
+    
+  lines.push(`import { ${interfaceName}Metadata } from '${entityImportPath}'`)
+  lines.push(`import type { ${interfaceName} } from '${entityImportPath}'`)
   lines.push(`import type {`)
   lines.push(`    ODataFilter,`)
   lines.push(`    ODataSelect,`)
