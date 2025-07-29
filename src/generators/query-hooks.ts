@@ -8,33 +8,8 @@ import type {
 } from '../processors/index.js'
 
 import type { TypeGenerationOptions } from './index.js'
+import { getHooksToEntityImportPath, getHooksToSharedImportPath, shouldOrganizeDirectories } from './import-utils.js'
 
-/**
- * Helper to determine the correct import path based on directory structure
- */
-function getEntityImportPath(
-  fromEntityLogicalName: string,
-  toEntityLogicalName: string,
-  primaryEntities: string[] = [],
-  relatedEntitiesDir: string = 'related'
-): string {
-  const fromIsPrimary = primaryEntities.includes(fromEntityLogicalName)
-  const toIsPrimary = primaryEntities.includes(toEntityLogicalName)
-  
-  if (fromIsPrimary && toIsPrimary) {
-    // Both primary: ../entity
-    return `../${toEntityLogicalName}.js`
-  } else if (fromIsPrimary && !toIsPrimary) {
-    // From primary to related: ../related/entity
-    return `../${relatedEntitiesDir}/${toEntityLogicalName}.js`
-  } else if (!fromIsPrimary && toIsPrimary) {
-    // From related to primary: ../../entity
-    return `../../${toEntityLogicalName}.js`
-  } else {
-    // Both related: ../entity
-    return `../${toEntityLogicalName}.js`
-  }
-}
 
 /**
  * Generate entity-specific examples to replace hardcoded PUM references
@@ -83,8 +58,11 @@ export function generateEntityHooks(
   const primaryKey = entityMetadata.primaryIdAttribute
   
   // Determine import paths based on directory structure
-  const entityImportPath = getEntityImportPath(entityMetadata.logicalName, entityMetadata.logicalName, primaryEntities, relatedEntitiesDir)
-  const queryTypesImportPath = primaryEntities.includes(entityMetadata.logicalName) ? '../query-types.js' : '../../query-types.js'
+  const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, options.nestedExpand ?? false, primaryEntities)
+  const entityImportPath = organizingDirectories 
+    ? getHooksToEntityImportPath(entityMetadata.logicalName, primaryEntities, relatedEntitiesDir)
+    : `../${entityMetadata.logicalName.toLowerCase()}.js`
+  const queryTypesImportPath = getHooksToSharedImportPath('query-types.js')
   
   // Import statements
   lines.push(`import { useQuery } from '@tanstack/react-query'`)
@@ -132,7 +110,7 @@ export function generateEntityHooks(
   const stateAttribute = entityMetadata.attributes.find(attr => attr.logicalName === 'statecode')
   if (stateAttribute?.optionSetName) {
     const stateConstantName = generateOptionSetConstantName(stateAttribute.optionSetName)
-    lines.push(`import { ${stateConstantName} } from '../${entityMetadata.logicalName}.js'`)
+    lines.push(`import { ${stateConstantName} } from '${entityImportPath}'`)
   }
   
   lines.push('')

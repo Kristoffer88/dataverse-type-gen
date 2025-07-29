@@ -3,6 +3,7 @@ import type {
   ProcessedAttributeMetadata, 
   ProcessedOptionSet
 } from '../processors/index.js'
+import { getEntityImportPath, getSharedImportPath, shouldOrganizeDirectories } from './import-utils.js'
 
 /**
  * TypeScript generation options
@@ -374,6 +375,10 @@ export function generateEntityFile(
   const lines: string[] = []
   const imports: Set<string> = new Set()
 
+  // Directory organization configuration
+  const { primaryEntities = [], relatedEntitiesDir = 'related', nestedExpand = false } = options
+  const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, nestedExpand, primaryEntities)
+
   // File header
   lines.push(`// Generated TypeScript definitions for ${entityMetadata.schemaName}`)
   lines.push(`// Entity: ${entityMetadata.displayName}`)
@@ -393,11 +398,16 @@ export function generateEntityFile(
     // Check if we actually use the constant (not just the type) in the entity
     const usesConstant = checkIfConstantIsUsed()
     
+    // Calculate correct import path for global choices
+    const globalChoicePath = organizingDirectories 
+      ? getSharedImportPath(entityMetadata.logicalName, `global-choices/${globalOptionSet.name}.js`, primaryEntities, relatedEntitiesDir)
+      : `./global-choices/${globalOptionSet.name}.js`
+    
     if (usesConstant) {
-      imports.add(`import { ${constantName}, type ${typeName}Value } from './global-choices/${globalOptionSet.name}.js'`)
+      imports.add(`import { ${constantName}, type ${typeName}Value } from '${globalChoicePath}'`)
     } else {
       // Only import the type if constant is not used
-      imports.add(`import type { ${typeName}Value } from './global-choices/${globalOptionSet.name}.js'`)
+      imports.add(`import type { ${typeName}Value } from '${globalChoicePath}'`)
     }
   }
 
@@ -600,7 +610,8 @@ function generateExpandTypes(
   options: TypeGenerationOptions = {},
   allEntities: ProcessedEntityMetadata[] = []
 ): { expandTypes: string, relatedEntityImports: string[] } {
-  const { includeComments = true, nestedExpand = false } = options
+  const { includeComments = true, nestedExpand = false, primaryEntities = [], relatedEntitiesDir = 'related' } = options
+  const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, nestedExpand, primaryEntities)
   const lines: string[] = []
   const schemaName = sanitizeInterfaceName(entityMetadata.schemaName)
   const relatedEntityImports: string[] = []
@@ -665,7 +676,10 @@ function generateExpandTypes(
     if (Object.keys(entityMetadata.relatedEntities).length > 0) {
       // Add imports for query types (only add once)
       if (!relatedEntityImports.some(imp => imp.includes('ODataFilter'))) {
-        relatedEntityImports.push(`import type { ODataFilter, ODataOrderBy } from './query-types.js'`)
+        const queryTypesPath = organizingDirectories 
+          ? getSharedImportPath(entityMetadata.logicalName, 'query-types.js', primaryEntities, relatedEntitiesDir)
+          : './query-types.js'
+        relatedEntityImports.push(`import type { ODataFilter, ODataOrderBy } from '${queryTypesPath}'`)
       }
       
       Object.entries(entityMetadata.relatedEntities).forEach(([relationshipName, info]) => {
@@ -678,9 +692,11 @@ function generateExpandTypes(
         
         // Add import for the target entity type (skip self-references)
         if (info.targetEntityLogicalName !== entityMetadata.logicalName) {
-          // Use the actual filename (lowercase schema name) for the import path
-          const targetFileName = relatedEntity.schemaName.toLowerCase()
-          relatedEntityImports.push(`import type { ${targetSchemaName} } from './${targetFileName}.js'`)
+          // Calculate correct import path based on directory organization
+          const entityImportPath = organizingDirectories 
+            ? getEntityImportPath(entityMetadata.logicalName, info.targetEntityLogicalName, primaryEntities, relatedEntitiesDir)
+            : `./${relatedEntity.schemaName.toLowerCase()}.js`
+          relatedEntityImports.push(`import type { ${targetSchemaName} } from '${entityImportPath}'`)
         }
         
         lines.push(`  "${relationshipName}"?: {`)

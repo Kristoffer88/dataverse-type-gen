@@ -6,11 +6,7 @@
   "includeMetadata": true,
   "includeValidation": true,
   "entities": ["pum_gantttask", "pum_initiative"],
-  "publisher": "pum",
-  "generateRelatedEntities": true,
-  "nestedExpand": false,
-  "maxRelatedEntityDepth": 2,  
-  "relatedEntitiesDir": "related",
+  "nestedExpand": true,
   "typeGeneration": {
     "useExactTypes": true,
     "generateHooks": true,
