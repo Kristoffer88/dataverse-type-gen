@@ -232,6 +232,63 @@ export async function fetchEntityMetadata(
 }
 
 /**
+ * Progress callback for entity fetching
+ */
+export type ProgressCallback = (current: number, total: number, entityName?: string) => void
+
+/**
+ * Fetch ALL entity metadata from Dataverse for complete type safety
+ * Used when nestedExpand is enabled in configuration
+ */
+export async function fetchAllEntityMetadata(
+  options: FetchEntityMetadataOptions & { onProgress?: ProgressCallback } = {}
+): Promise<EntityDefinition[]> {
+  console.log(`🌍 Fetching ALL entities from Dataverse for complete type safety...`)
+  
+  try {
+    // Get all entities with basic metadata first
+    const allEntities = await fetchAllEntities({
+      select: [
+        'LogicalName',
+        'SchemaName', 
+        'DisplayName',
+        'Description',
+        'HasActivities',
+        'HasFeedback',
+        'HasNotes',
+        'IsActivity',
+        'IsCustomEntity',
+        'OwnershipType',
+        'PrimaryIdAttribute',
+        'PrimaryNameAttribute',
+        'EntitySetName'
+      ]
+    })
+    
+    console.log(`📊 Found ${allEntities.length} total entities in Dataverse`)
+    
+    // Now fetch detailed metadata for each entity if attributes are requested
+    if (options.includeAttributes) {
+      const entitiesWithAttributes = await fetchMultipleEntities(
+        allEntities.map(e => e.LogicalName),
+        { ...options, onProgress: options.onProgress }
+      )
+      
+      console.log(`✅ Successfully fetched detailed metadata for ${entitiesWithAttributes.length} entities`)
+      return entitiesWithAttributes
+    }
+    
+    return allEntities
+    
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(`Error fetching all entity metadata: ${error.message}`)
+    }
+    throw error
+  }
+}
+
+/**
  * Fetch multiple entities metadata including related entities for type-safe expands
  */
 export async function fetchMultipleEntitiesWithRelated(
@@ -445,12 +502,14 @@ export async function fetchPublisherEntities(
  */
 export async function fetchMultipleEntities(
   entityNames: string[],
-  options: FetchEntityMetadataOptions = {}
+  options: FetchEntityMetadataOptions & { onProgress?: ProgressCallback } = {}
 ): Promise<EntityDefinition[]> {
   const entities: EntityDefinition[] = []
+  const { onProgress } = options
   
   // Process entities in batches to avoid overwhelming the API
-  const batchSize = 5
+  // Reduced batch size and increased delays to respect rate limits
+  const batchSize = 3
   for (let i = 0; i < entityNames.length; i += batchSize) {
     const batch = entityNames.slice(i, i + batchSize)
     
@@ -470,9 +529,18 @@ export async function fetchMultipleEntities(
       }
     }
     
-    // Add small delay between batches to be respectful to the API
+    // Report progress after each batch
+    if (onProgress) {
+      const currentCount = Math.min(i + batchSize, entityNames.length)
+      const lastEntityInBatch = batch[batch.length - 1]
+      onProgress(currentCount, entityNames.length, lastEntityInBatch)
+    }
+    
+    // Add longer delay between batches to respect API rate limits
+    // With 8000 requests per 300 seconds, we can make ~26 requests per second max
+    // Using batch size 3 with 250ms delay = ~12 requests/second for safety
     if (i + batchSize < entityNames.length) {
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 250))
     }
   }
   

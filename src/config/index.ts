@@ -31,6 +31,9 @@ export interface DataverseTypeGenConfig {
   /** Maximum depth for related entity generation (prevents infinite recursion) */
   maxRelatedEntityDepth?: number
   
+  /** Generate ALL entities from Dataverse for complete type safety (replaces generateRelatedEntities) */
+  nestedExpand?: boolean
+  
   /** Authentication configuration */
   auth?: {
     clientId?: string
@@ -60,6 +63,7 @@ export const DEFAULT_CONFIG: DataverseTypeGenConfig = {
   fileExtension: '.ts',
   generateRelatedEntities: true, // Enable type-safe nested expands by default
   maxRelatedEntityDepth: 2, // Prevent infinite recursion while allowing reasonable nesting
+  nestedExpand: false, // Default to false for backward compatibility
   typeGeneration: {
     includeComments: true,
     includeValidation: true,

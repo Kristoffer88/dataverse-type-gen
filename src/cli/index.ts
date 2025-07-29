@@ -9,7 +9,8 @@ import {
   fetchEntityMetadata,
   fetchPublisherEntities,
   fetchSolutionEntities,
-  fetchAllEntities 
+  fetchAllEntities,
+  fetchAllEntityMetadata
 } from '../client/index.js'
 import { processEntityMetadata, type ProcessedEntityMetadata } from '../processors/index.js'
 import { 
@@ -32,6 +33,7 @@ interface CLIConfig {
   includeValidation: boolean
   generateRelatedEntities: boolean
   maxRelatedEntityDepth: number
+  nestedExpand: boolean
   overwrite: boolean
   verbose: boolean
   debug: boolean
@@ -52,6 +54,7 @@ const DEFAULT_CLI_CONFIG: CLIConfig = {
   includeValidation: true,
   generateRelatedEntities: false, // Default to false for CLI to avoid unexpected behavior
   maxRelatedEntityDepth: 2,
+  nestedExpand: false, // Default to false for backward compatibility
   overwrite: true,
   verbose: false,
   debug: false,
@@ -364,6 +367,9 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
     if (options.generateRelatedEntities !== undefined) {
       config.generateRelatedEntities = Boolean(options.generateRelatedEntities)
     }
+    if (options.nestedExpand !== undefined) {
+      config.nestedExpand = Boolean(options.nestedExpand)
+    }
     
     // Validate inputs before proceeding
     await validateInputs(config, logger)
@@ -445,104 +451,138 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
       return
     }
 
-    // Fetch and process entities
-    logger.info(`📥 Fetching metadata for ${entitiesToProcess.length} entities...`)
-    const processedEntities = []
+    // Determine entity processing strategy
+    let processedEntities: ProcessedEntityMetadata[] = []
+    let allEntitiesForLookup: ProcessedEntityMetadata[] = []
     
-    for (let i = 0; i < entitiesToProcess.length; i++) {
-      const entityName = entitiesToProcess[i]
-      if (!loggerOptions.quiet) {
-        logger.progress(i + 1, entitiesToProcess.length, entityName)
-      }
+    if (config.nestedExpand) {
+      // NEW APPROACH: Fetch ALL entities for complete type safety
+      logger.info(`🌍 Using nestedExpand mode - fetching ALL entities for complete type safety...`)
+      logger.info(`⚠️  This will take several minutes due to API rate limiting (respecting Dataverse limits)`)
       
-      try {
-        const rawMetadata = await fetchEntityMetadata(entityName, {
-          includeAttributes: true,
-          includeRelationships: true
-        })
-        
-        if (rawMetadata) {
-          const processed = processEntityMetadata(rawMetadata)
-          processedEntities.push(processed)
-          logger.verboseDebug(`✅ Processed ${entityName} (${processed.attributes.length} attributes)`)
-        } else {
-          logger.warning(`Entity ${entityName} not found`)
+      const allEntityMetadata = await fetchAllEntityMetadata({
+        includeAttributes: true,
+        includeRelationships: true,
+        onProgress: (current, total, entityName) => {
+          if (!loggerOptions.quiet) {
+            logger.progress(current, total, `Fetching: ${entityName}`)
+          }
+        }
+      })
+      
+      // Process all entities
+      logger.info(`📝 Processing ${allEntityMetadata.length} entities...`)
+      for (let i = 0; i < allEntityMetadata.length; i++) {
+        const entityMetadata = allEntityMetadata[i]
+        if (!loggerOptions.quiet && (i % 25 === 0 || i === allEntityMetadata.length - 1)) { // Show progress every 25 entities
+          logger.progress(i + 1, allEntityMetadata.length, entityMetadata.LogicalName)
         }
         
-      } catch (error) {
-        logger.error(`Failed to process ${entityName}: ${error instanceof Error ? error.message : String(error)}`)
+        try {
+          const processed = processEntityMetadata(entityMetadata)
+          allEntitiesForLookup.push(processed)
+          
+          // Keep track of primary entities (the ones user specifically requested)
+          if (entitiesToProcess.includes(entityMetadata.LogicalName)) {
+            processedEntities.push(processed)
+          }
+          
+        } catch (error) {
+          logger.warning(`Failed to process ${entityMetadata.LogicalName}: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
+      
+      logger.success(`Successfully processed ${allEntitiesForLookup.length} total entities (${processedEntities.length} primary entities)`)
+      
+    } else {
+      // ORIGINAL APPROACH: Fetch only specified entities + related entities if enabled
+      logger.info(`📥 Fetching metadata for ${entitiesToProcess.length} specified entities...`)
+      
+      for (let i = 0; i < entitiesToProcess.length; i++) {
+        const entityName = entitiesToProcess[i]
+        if (!loggerOptions.quiet) {
+          logger.progress(i + 1, entitiesToProcess.length, entityName)
+        }
+        
+        try {
+          const rawMetadata = await fetchEntityMetadata(entityName, {
+            includeAttributes: true,
+            includeRelationships: true
+          })
+          
+          if (rawMetadata) {
+            const processed = processEntityMetadata(rawMetadata)
+            processedEntities.push(processed)
+            logger.verboseDebug(`✅ Processed ${entityName} (${processed.attributes.length} attributes)`)
+          } else {
+            logger.warning(`Entity ${entityName} not found`)
+          }
+          
+        } catch (error) {
+          logger.error(`Failed to process ${entityName}: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
+
+      // Copy primary entities to allEntitiesForLookup
+      allEntitiesForLookup = [...processedEntities]
+
+      // Process related entities if enabled (old behavior)
+      if (config.generateRelatedEntities && processedEntities.length > 0) {
+        logger.info(`🔗 Discovering related entities (max depth: ${config.maxRelatedEntityDepth})...`)
+        
+        // Collect all unique related entity logical names
+        const relatedEntityNames = new Set<string>()
+        const processedEntityNames = new Set(processedEntities.map(e => e.logicalName))
+        
+        for (const entity of processedEntities) {
+          Object.values(entity.relatedEntities).forEach(relatedInfo => {
+            // Only add if not already processed as a primary entity
+            if (!processedEntityNames.has(relatedInfo.targetEntityLogicalName) && 
+                !relatedEntityNames.has(relatedInfo.targetEntityLogicalName)) {
+              relatedEntityNames.add(relatedInfo.targetEntityLogicalName)
+            }
+          })
+        }
+        
+        if (relatedEntityNames.size > 0) {
+          logger.info(`📥 Found ${relatedEntityNames.size} related entities to process...`)
+          
+          const relatedEntityNamesArray = Array.from(relatedEntityNames)
+          for (let i = 0; i < relatedEntityNamesArray.length; i++) {
+            const entityName = relatedEntityNamesArray[i]
+            if (!loggerOptions.quiet) {
+              logger.progress(i + 1, relatedEntityNamesArray.length, `Related: ${entityName}`)
+            }
+            
+            try {
+              const rawMetadata = await fetchEntityMetadata(entityName, {
+                includeAttributes: true,
+                includeRelationships: true
+              })
+              
+              if (rawMetadata) {
+                const processed = processEntityMetadata(rawMetadata)
+                allEntitiesForLookup.push(processed)
+                logger.verboseDebug(`✅ Processed related entity ${entityName} (${processed.attributes.length} attributes)`)
+              } else {
+                logger.warning(`Related entity ${entityName} not found`)
+              }
+              
+            } catch (error) {
+              logger.warning(`Failed to process related entity ${entityName}: ${error instanceof Error ? error.message : String(error)}`)
+            }
+          }
+          
+          logger.success(`Successfully processed ${allEntitiesForLookup.length - processedEntities.length} related entities`)
+        } else {
+          logger.info('No related entities found to process')
+        }
       }
     }
 
     if (processedEntities.length === 0) {
-      logger.error('No entities were successfully processed')
+      logger.error('No primary entities were successfully processed')
       process.exit(1)
-    }
-
-    logger.success(`Successfully processed ${processedEntities.length} entities`)
-
-    // Fetch and process related entities if enabled
-    logger.debugLog(`DEBUG: This line should always execute!!!`)
-    let relatedEntities: ProcessedEntityMetadata[] = []
-    logger.debugLog(`DEBUG: About to check related entities`)
-    logger.debugLog(`Checking related entities: generateRelatedEntities=${config.generateRelatedEntities}, processedEntities.length=${processedEntities.length}`)
-    logger.debugLog(`Type of generateRelatedEntities: ${typeof config.generateRelatedEntities}`)
-    logger.debugLog(`Type of processedEntities.length: ${typeof processedEntities.length}`)
-    if (config.generateRelatedEntities && processedEntities.length > 0) {
-      logger.info(`🔗 Discovering related entities (max depth: ${config.maxRelatedEntityDepth})...`)
-      
-      // Collect all unique related entity logical names
-      const relatedEntityNames = new Set<string>()
-      const processedEntityNames = new Set(processedEntities.map(e => e.logicalName))
-      
-      for (const entity of processedEntities) {
-        logger.debugLog(`Entity ${entity.logicalName} has ${Object.keys(entity.relatedEntities).length} related entities`)
-        Object.values(entity.relatedEntities).forEach(relatedInfo => {
-          logger.debugLog(`  - Found related entity: ${relatedInfo.targetEntityLogicalName}`)
-          // Only add if not already processed as a primary entity and within depth limit
-          if (!processedEntityNames.has(relatedInfo.targetEntityLogicalName) && 
-              !relatedEntityNames.has(relatedInfo.targetEntityLogicalName)) {
-            relatedEntityNames.add(relatedInfo.targetEntityLogicalName)
-            logger.debugLog(`    -> Added to processing queue`)
-          } else {
-            logger.debugLog(`    -> Skipped (already processed or queued)`)
-          }
-        })
-      }
-      
-      if (relatedEntityNames.size > 0) {
-        logger.info(`📥 Found ${relatedEntityNames.size} related entities to process...`)
-        
-        const relatedEntityNamesArray = Array.from(relatedEntityNames)
-        for (let i = 0; i < relatedEntityNamesArray.length; i++) {
-          const entityName = relatedEntityNamesArray[i]
-          if (!loggerOptions.quiet) {
-            logger.progress(i + 1, relatedEntityNamesArray.length, `Related: ${entityName}`)
-          }
-          
-          try {
-            const rawMetadata = await fetchEntityMetadata(entityName, {
-              includeAttributes: true,
-              includeRelationships: true
-            })
-            
-            if (rawMetadata) {
-              const processed = processEntityMetadata(rawMetadata)
-              relatedEntities.push(processed)
-              logger.verboseDebug(`✅ Processed related entity ${entityName} (${processed.attributes.length} attributes)`)
-            } else {
-              logger.warning(`Related entity ${entityName} not found`)
-            }
-            
-          } catch (error) {
-            logger.warning(`Failed to process related entity ${entityName}: ${error instanceof Error ? error.message : String(error)}`)
-          }
-        }
-        
-        logger.success(`Successfully processed ${relatedEntities.length} related entities`)
-      } else {
-        logger.info('No related entities found to process')
-      }
     }
 
     // Generate TypeScript files
@@ -572,6 +612,12 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
         includeBindingTypes: (config as { typeGeneration?: { includeBindingTypes?: boolean } }).typeGeneration?.includeBindingTypes ?? true,
       }
     }
+    
+    // For the generate function, we need to separate primary entities from related entities
+    // In nestedExpand mode, all entities except primary ones are "related entities"
+    const relatedEntities = allEntitiesForLookup.filter(entity => 
+      !processedEntities.some(primary => primary.logicalName === entity.logicalName)
+    )
     
     const result = await generateMultipleEntityTypes(processedEntities, codeGenConfig, relatedEntities)
     
@@ -808,6 +854,7 @@ export function setupCLI(): Command {
     .option('--no-overwrite', 'Do not overwrite existing files')
     .option('--generate-related-entities', 'Generate metadata for related entities to enable type-safe nested expands')
     .option('--max-related-depth <depth>', 'Maximum depth for related entity generation (prevents infinite recursion)', '2')
+    .option('--nested-expand', 'Generate ALL entities for complete type safety (replaces generate-related-entities)')
     .option('-c, --config <path>', 'Configuration file path')
     .option('-v, --verbose', 'Verbose output')
     .option('--debug', 'Enable debug mode with detailed logging')
@@ -824,7 +871,8 @@ Examples:
   $ dataverse-type-gen generate --solution "My Custom Solution" --output-format json
   $ dataverse-type-gen generate --config ./custom-config.json --verbose
   $ dataverse-type-gen generate --entities pum_initiative --generate-related-entities --max-related-depth 3
-  $ dataverse-type-gen generate --publisher pum --generate-related-entities`)
+  $ dataverse-type-gen generate --publisher pum --generate-related-entities
+  $ dataverse-type-gen generate --entities pum_initiative --nested-expand`)
     .action(generateCommand)
   
   // Init command

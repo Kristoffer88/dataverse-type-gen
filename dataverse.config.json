@@ -1,13 +1,12 @@
 {
-  "outputDir": "./generated",
+  "outputDir": "./pcf-demo/generated",
   "fileExtension": ".ts",
   "includeComments": true,
   "includeMetadata": true,
   "includeValidation": true,
   "entities": ["pum_initiative", "pum_program", "pum_portfolio"],
   "publisher": "pum",
-  "generateRelatedEntities": true,
-  "maxRelatedEntityDepth": 2,
+  "nestedExpand": true,
   "typeGeneration": {
     "useExactTypes": true,
     "generateHooks": true,
