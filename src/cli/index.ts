@@ -17,6 +17,11 @@ import {
   generateMultipleEntityTypes,
   type CodeGenConfig 
 } from '../codegen/index.js'
+import { 
+  loadConfiguration,
+  toCodeGenConfig,
+  type DataverseTypeGenConfig 
+} from '../config/index.js'
 
 /**
  * CLI configuration interface
@@ -274,37 +279,29 @@ class SimpleLogger {
 }
 
 /**
- * Load configuration from file
+ * Convert DataverseTypeGenConfig to CLI-compatible format
  */
-async function loadConfig(configPath?: string): Promise<Partial<CLIConfig>> {
-  const possiblePaths = [
-    configPath,
-    'dataverse.config.js',
-    'dataverse.config.ts',
-    '.dataverserc.json',
-    '.dataverserc'
-  ].filter(Boolean) as string[]
-
-  for (const path of possiblePaths) {
-    try {
-      const fullPath = resolve(path)
-      await fs.access(fullPath)
-      
-      if (path.endsWith('.json')) {
-        const content = await fs.readFile(fullPath, 'utf8')
-        return JSON.parse(content)
-      }
-      
-      // For JS/TS config files, we'd need dynamic import
-      // For now, just support JSON
-      console.warn(`Config file ${path} found but JS/TS config loading not implemented yet`)
-      
-    } catch {
-      // File doesn't exist, continue to next
-    }
+function convertToCliConfig(config: DataverseTypeGenConfig): Partial<CLIConfig> {
+  return {
+    dataverseUrl: config.dataverseUrl,
+    outputDir: config.outputDir,
+    entities: config.entities,
+    publisher: config.publisher,
+    solution: config.solution,
+    fileExtension: config.fileExtension,
+    includeComments: config.typeGeneration.includeComments ?? true,
+    includeMetadata: config.typeGeneration.includeMetadata ?? true,
+    includeValidation: config.typeGeneration.includeValidation ?? true,
+    generateRelatedEntities: config.generateRelatedEntities ?? false,
+    maxRelatedEntityDepth: config.maxRelatedEntityDepth ?? 2,
+    nestedExpand: config.nestedExpand ?? false,
+    overwrite: true, // Always overwrite for CLI
+    verbose: false,
+    debug: false,
+    quiet: false,
+    dryRun: false,
+    outputFormat: 'text'
   }
-
-  return {}
 }
 
 /**
@@ -357,8 +354,20 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
       logger.info('🔍 Running in dry-run mode - no files will be generated')
     }
     
-    // Load configuration
-    const config = { ...DEFAULT_CLI_CONFIG, ...(await loadConfig(options.config as string)), ...options }
+    // Load configuration using the proper config system
+    const dataverseConfig = await loadConfiguration(options.config as string)
+    const configFromFile = convertToCliConfig(dataverseConfig)
+    
+    // Merge: defaults < config file < explicit CLI options  
+    // Only include CLI options that were explicitly provided (not undefined)
+    const explicitCliOptions: Partial<CLIConfig> = {}
+    Object.keys(options).forEach(key => {
+      if (options[key] !== undefined) {
+        explicitCliOptions[key as keyof CLIConfig] = options[key] as any
+      }
+    })
+    
+    const config = { ...DEFAULT_CLI_CONFIG, ...configFromFile, ...explicitCliOptions }
     
     // Parse CLI-specific options that need type conversion
     if (options.maxRelatedDepth) {
@@ -598,20 +607,27 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
     
     logger.info(`📝 Generating TypeScript files in ${config.outputDir}...`)
     
-    const codeGenConfig: Partial<CodeGenConfig> = {
+    // Convert back to DataverseTypeGenConfig format and use the proper transformation
+    const finalDataverseConfig: DataverseTypeGenConfig = {
+      ...dataverseConfig,
+      // Override with any CLI options that were provided
       outputDir: config.outputDir,
       fileExtension: config.fileExtension,
-      indexFile: true,
-      overwrite: config.overwrite,
-      generateHooks: (config as { typeGeneration?: { generateHooks?: boolean } }).typeGeneration?.generateHooks ?? false,
-      typeGenerationOptions: {
+      entities: Array.isArray(config.entities) ? config.entities : (config.entities ? [config.entities] : dataverseConfig.entities),
+      publisher: config.publisher,
+      solution: config.solution,
+      generateRelatedEntities: config.generateRelatedEntities,
+      maxRelatedEntityDepth: config.maxRelatedEntityDepth,
+      nestedExpand: config.nestedExpand,
+      typeGeneration: {
+        ...dataverseConfig.typeGeneration,
         includeComments: config.includeComments,
         includeMetadata: config.includeMetadata,
         includeValidation: config.includeValidation,
-        includeLookupValues: (config as { typeGeneration?: { includeLookupValues?: boolean } }).typeGeneration?.includeLookupValues ?? true,
-        includeBindingTypes: (config as { typeGeneration?: { includeBindingTypes?: boolean } }).typeGeneration?.includeBindingTypes ?? true,
       }
     }
+    
+    const codeGenConfig: Partial<CodeGenConfig> = toCodeGenConfig(finalDataverseConfig)
     
     // For the generate function, we need to separate primary entities from related entities
     // In nestedExpand mode, all entities except primary ones are "related entities"
@@ -808,15 +824,15 @@ async function validateCommand(options: Record<string, unknown>): Promise<void> 
     }
     
     // Validate configuration file if exists
-    const config = await loadConfig(options.config as string)
-    if (Object.keys(config).length > 0) {
+    try {
+      const dataverseConfig = await loadConfiguration(options.config as string)
       logger.success('Configuration file loaded successfully')
       
       if (options.verbose) {
-        logger.verboseDebug(`Configuration: ${JSON.stringify(config, null, 2)}`)
+        logger.verboseDebug(`Configuration: ${JSON.stringify(dataverseConfig, null, 2)}`)
       }
-    } else {
-      logger.info('No configuration file found (using defaults)')
+    } catch (error) {
+      logger.info(`No configuration file found (using defaults): ${error instanceof Error ? error.message : String(error)}`)
     }
     
     logger.success('🎉 Validation completed successfully!')
@@ -842,7 +858,7 @@ export function setupCLI(): Command {
   program
     .command('generate')
     .description('Generate TypeScript types from Dataverse entities')
-    .option('-o, --output-dir <dir>', 'Output directory for generated files', './generated')
+    .option('-o, --output-dir <dir>', 'Output directory for generated files')
     .option('-e, --entities <entities>', 'Comma-separated entity logical names (e.g. account,contact,opportunity)')
     .option('-p, --publisher <prefix>', 'Publisher prefix to filter entities (naming convention based)')
     .option('-s, --solution <name>', 'Solution name to filter entities (actual solution membership)')
@@ -879,7 +895,7 @@ Examples:
   program
     .command('init')
     .description('Initialize Dataverse type generator configuration')
-    .option('-o, --output-dir <dir>', 'Output directory for generated files', './generated')
+    .option('-o, --output-dir <dir>', 'Output directory for generated files')
     .option('-c, --config <path>', 'Configuration file path', 'dataverse.config.json')
     .option('-v, --verbose', 'Verbose output')
     .addHelpText('after', `

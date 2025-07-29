@@ -691,13 +691,14 @@ function generateExpandTypes(
     lines.push(`}`)
   } else {
     // Simple mode: Basic expand support with minimal imports
-    lines.push(`export type ${expandTypeName} = ${expandablePropsTypeName}[]`)
+    lines.push(`export type ${expandTypeName} = ${expandablePropsTypeName}[] | Record<string, any>`)
     
     if (includeComments) {
       lines.push('')
       lines.push(`/**`)
       lines.push(` * Basic expand options for ${entityMetadata.displayName}`)
       lines.push(` * Use string array format: ["relationship1", "relationship2"]`)
+      lines.push(` * Or object format (no type safety): { "relationship": { $select: [...] } }`)
       lines.push(` */`)
     }
   }

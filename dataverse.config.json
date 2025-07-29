@@ -4,7 +4,7 @@
   "includeComments": true,
   "includeMetadata": true,
   "includeValidation": true,
-  "entities": ["pum_initiative"],
+  "entities": ["pum_initiative", "pum_gantttask"],
   "publisher": "pum",
   "generateRelatedEntities": true,
   "maxRelatedEntityDepth": 1,
