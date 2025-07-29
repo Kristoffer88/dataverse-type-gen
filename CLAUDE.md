@@ -27,6 +27,9 @@ export DATAVERSE_INSTANCE=https://ssopowerppm.crm4.dynamics.com
 
 **Generate Types Command:**
 ```bash
+# For testing implementations in pcf-demo (use this during development)
+cd /Users/kristoffer/private/repos/dataverse-type-gen && DATAVERSE_INSTANCE=https://ssopowerppm.crm4.dynamics.com node dist/bin/cli.cjs generate --entities pum_initiative,pum_gantttask --generate-related-entities
+
 # Generate types using configuration file
 node dist/bin/cli.cjs generate --config dataverse.config.json
 

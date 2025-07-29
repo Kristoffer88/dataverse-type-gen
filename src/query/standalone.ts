@@ -43,9 +43,9 @@ export const DataverseUrls = {
    * Get URL for a single entity by ID
    * 
    * @example
-   * const url = DataverseUrls.entity(pum_InitiativeMetadata, "123e4567-e89b-12d3-a456-426614174000", {
-   *   $select: ['pum_name', 'pum_description'],
-   *   $expand: ['pum_relatedprogram']
+   * const url = DataverseUrls.entity(entityMetadata, "123e4567-e89b-12d3-a456-426614174000", {
+   *   $select: ['<primary_name_field>', '<description_field>'],
+   *   $expand: ['<related_entity>']
    * })
    */
   entity<TEntity>(
@@ -68,13 +68,13 @@ export const DataverseUrls = {
    * Get URL for entity collection (list)
    * 
    * @example
-   * const url = DataverseUrls.entitySet(pum_InitiativeMetadata, {
+   * const url = DataverseUrls.entitySet(entityMetadata, {
    *   $filter: { 
-   *     pum_name: { $contains: "project" },
-   *     statecode: PumInitiativeStatecode.Active.Value 
+   *     '<name_field>': { $contains: "search_term" },
+   *     statecode: '<EntityStatecode>'.Active.Value 
    *   },
-   *   $select: ['pum_name', 'pum_description'],
-   *   $orderby: { pum_name: 'asc' },
+   *   $select: ['<primary_name_field>', '<description_field>'],
+   *   $orderby: { '<name_field>': 'asc' },
    *   $top: 50
    * })
    */
@@ -97,8 +97,8 @@ export const DataverseUrls = {
    * Get URL for counting entities
    * 
    * @example
-   * const url = DataverseUrls.count(pum_InitiativeMetadata, {
-   *   $filter: { statecode: PumInitiativeStatecode.Active.Value }
+   * const url = DataverseUrls.count(entityMetadata, {
+   *   $filter: { statecode: '<EntityStatecode>'.Active.Value }
    * })
    */
   count<TEntity>(
@@ -120,10 +120,10 @@ export const DataverseUrls = {
    * Get URL for related entities
    * 
    * @example
-   * const url = DataverseUrls.related(pum_InitiativeMetadata, "123e4567-e89b-12d3-a456-426614174000", "pum_initiative_tasks", {
-   *   $filter: { statecode: PumTaskStatecode.Active.Value },
-   *   $select: ['pum_name', 'pum_duedate'],
-   *   $orderby: { pum_duedate: 'asc' }
+   * const url = DataverseUrls.related(entityMetadata, "123e4567-e89b-12d3-a456-426614174000", "<entity_relationship>", {
+   *   $filter: { statecode: '<RelatedEntityStatecode>'.Active.Value },
+   *   $select: ['<primary_name_field>', '<date_field>'],
+   *   $orderby: { '<date_field>': 'asc' }
    * })
    */
   related<TRelated = Record<string, unknown>>(

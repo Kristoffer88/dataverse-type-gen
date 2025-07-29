@@ -246,14 +246,13 @@ export interface UseEntityListOptions<TEntity, TMetadata = any> extends ODataQue
 }
 
 // Mutation types for create/update operations
+import type { NonIdFields, OnlyIdFields } from '../types/type-utilities.js'
+
 export type EntityCreateInput<TEntity, TBindings = Record<string, never>> = 
-  Partial<Omit<TEntity, string & keyof { [K in keyof TEntity]: TEntity[K] extends string ? K extends `${string}id` ? K : never : never }>> & 
-  Partial<TBindings>
+  Partial<NonIdFields<TEntity>> & Partial<TBindings>
 
 export type EntityUpdateInput<TEntity, TBindings = Record<string, never>> = 
-  Partial<Omit<TEntity, string & keyof { [K in keyof TEntity]: TEntity[K] extends string ? K extends `${string}id` ? K : never : never }>> & 
-  Partial<TBindings> &
-  { [K in keyof TEntity]: K extends `${string}id` ? TEntity[K] : never }[keyof TEntity]
+  Partial<NonIdFields<TEntity>> & Partial<TBindings> & OnlyIdFields<TEntity>
 
 // Response types
 export interface ODataResponse<T> {

@@ -37,6 +37,32 @@ function getEntityImportPath(
 }
 
 /**
+ * Generate entity-specific examples to replace hardcoded PUM references
+ */
+function generateEntitySpecificExamples(entityMetadata: ProcessedEntityMetadata): string[] {
+  const pascalTypeName = toPascalCaseTypeName(entityMetadata.schemaName)
+  const entityName = entityMetadata.logicalName
+  const primaryName = entityMetadata.primaryNameAttribute || 'name'
+  
+  return [
+    ` * import { use${pascalTypeName}, use${pascalTypeName}List } from './hooks'`,
+    ` * const { data: entity } = use${pascalTypeName}('123e4567-e89b-12d3-a456-426614174000')`,
+    ` * const { data: entities } = use${pascalTypeName}List({ statecode: 0 })`,
+    `      { statecode: ${pascalTypeName}Statecode.Active.Value }`,
+    `  $select: ['${primaryName}', '${entityMetadata.primaryIdAttribute}', 'createdon'],`,
+    `await invalidateEntityQueries(queryClient, '${entityName}')`
+  ]
+}
+
+/**
+ * Convert schema name to PascalCase type name
+ */
+function toPascalCaseTypeName(schemaName: string): string {
+  return schemaName.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+    .replace(/^[a-z]/, letter => letter.toUpperCase())
+}
+
+/**
  * Generate individual, composable React Query hooks for an entity
  * Each hook is standalone and can be easily customized by developers
  */
@@ -402,13 +428,7 @@ export function generateEntityQueryBuilders(
   }
   lines.push('')
   
-  // Import types and metadata
-  const metadataImportPath = getEntityImportPath(
-    entityMetadata.logicalName,
-    entityMetadata.logicalName,
-    options.primaryEntities || [],
-    options.relatedEntitiesDir || 'related'
-  ).replace('.js', '.js') // Entity imports self for metadata and interface
+  // Import types and metadata (variable removed as it was unused after refactoring)
   
   // Correct path for queries directory structure
   // Primary entities: queries/entity.queries.ts → ../entity.js
@@ -748,15 +768,18 @@ export function generateHooksIndex(
   lines.push(`// Generated: ${new Date().toISOString()}`)
   lines.push('')
   
-  if (includeComments) {
+  if (includeComments && entities.length > 0) {
+    const firstEntity = entities[0]
+    const examples = generateEntitySpecificExamples(firstEntity)
+    
     lines.push(`/**`)
     lines.push(` * Barrel exports for all entity React Query hooks`)
     lines.push(` * `)
     lines.push(` * @example`)
-    lines.push(` * import { usePumInitiative, usePumInitiativeList } from './hooks'`)
+    lines.push(examples[0]) // import example
     lines.push(` * `)
-    lines.push(` * const { data: initiative } = usePumInitiative('123e4567-e89b-12d3-a456-426614174000')`)
-    lines.push(` * const { data: initiatives } = usePumInitiativeList({ statecode: 0 })`)
+    lines.push(examples[1]) // single entity example
+    lines.push(examples[2]) // entity list example
     lines.push(` */`)
     lines.push('')
   }
@@ -854,30 +877,40 @@ export function generateHooksDocumentation(
   lines.push(`## Advanced Usage`)
   lines.push('')
   lines.push(`\`\`\`typescript`)
-  lines.push(`// Complex filtering with option sets`)
-  lines.push(`const { data } = usePumInitiativeList({`)
-  lines.push(`  $filter: {`)
-  lines.push(`    $and: [`)
-  lines.push(`      { statecode: PumInitiativeStatecode.Active.Value },`)
-  lines.push(`      { pum_status: PumStatus.InProgress.Value }`)
-  lines.push(`    ]`)
-  lines.push(`  },`)
-  lines.push(`  $select: ['pum_name', 'pum_description', 'createdon'],`)
-  lines.push(`  $orderby: { createdon: 'desc' },`)
-  lines.push(`  $top: 10`)
-  lines.push(`})`)
-  lines.push('')
-  lines.push(`// Cache invalidation`)
-  lines.push(`import { useQueryClient } from '@tanstack/react-query'`)
-  lines.push(`import { invalidateEntityQueries } from 'dataverse-type-gen'`)
-  lines.push('')
-  lines.push(`const queryClient = useQueryClient()`)
-  lines.push('')
-  lines.push(`// Invalidate all initiative queries`)
-  lines.push(`await invalidateEntityQueries(queryClient, 'pum_initiative')`)
+  if (entities.length > 0) {
+    const firstEntity = entities[0]
+    const examples = generateEntitySpecificExamples(firstEntity)
+    const pascalTypeName = toPascalCaseTypeName(firstEntity.schemaName)
+    
+    lines.push(`// Complex filtering with option sets`)
+    lines.push(`const { data } = use${pascalTypeName}List({`)
+    lines.push(`  $filter: {`)
+    lines.push(`    $and: [`)
+    lines.push(examples[3]) // statecode example
+    lines.push(`    ]`)
+    lines.push(`  },`)
+    lines.push(examples[4]) // $select example
+    lines.push(`  $orderby: { createdon: 'desc' },`)
+    lines.push(`  $top: 10`)
+    lines.push(`})`)
+    lines.push('')
+    lines.push(`// Cache invalidation`)
+    lines.push(`import { useQueryClient } from '@tanstack/react-query'`)
+    lines.push(`import { invalidateEntityQueries } from 'dataverse-type-gen'`)
+    lines.push('')
+    lines.push(`const queryClient = useQueryClient()`)
+    lines.push('')
+    lines.push(`// Invalidate all queries`)
+    lines.push(examples[5]) // invalidate example
+  }
   lines.push('')
   lines.push(`// Invalidate specific query`)
-  lines.push(`await invalidateEntityQueries(queryClient, 'pum_initiative', {`)
+  if (entities.length > 0) {
+    const firstEntity = entities[0]
+    lines.push(`await invalidateEntityQueries(queryClient, '${firstEntity.logicalName}', {`)
+  } else {
+    lines.push(`await invalidateEntityQueries(queryClient, '<entity_logical_name>', {`)
+  }
   lines.push(`  operation: 'single',`)
   lines.push(`  id: '123e4567-e89b-12d3-a456-426614174000'`)
   lines.push(`})`)

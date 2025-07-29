@@ -14,7 +14,7 @@ npm install dataverse-type-gen @tanstack/react-query react
 // dataverse.config.json
 {
   "outputDir": "./src/generated",
-  "publisher": "pum",
+  "publisher": "<your_publisher_prefix>",
   "typeGeneration": {
     "generateHooks": true,
     "includeComments": true,
@@ -30,8 +30,8 @@ npx dataverse-type-gen
 ```
 
 This generates:
-- `./src/generated/pum_initiative.ts` - Type definitions
-- `./src/generated/hooks/pum_initiative.hooks.ts` - React Query hooks
+- `./src/generated/<entity_name>.ts` - Type definitions
+- `./src/generated/hooks/<entity_name>.hooks.ts` - React Query hooks
 - `./src/generated/index.ts` - Barrel exports
 
 ## App Setup
