@@ -36,8 +36,7 @@ export function getEntityImportPath(
 export function getSharedImportPath(
   fromEntityLogicalName: string,
   sharedFile: string,
-  primaryEntities: string[] = [],
-  relatedEntitiesDir: string = 'related'
+  primaryEntities: string[] = []
 ): string {
   const fromIsPrimary = primaryEntities.includes(fromEntityLogicalName)
   
