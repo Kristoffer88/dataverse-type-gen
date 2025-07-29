@@ -978,8 +978,94 @@ function generateFallbackQueryTypes(): string {
   return `// Basic OData query types for Dataverse operations
 // NOTE: Use entity-specific expand types instead of these generic types for full type safety
 
+// Base OData operators for different field types
+export type StringOperators<T = string> = {
+  $eq?: T
+  $ne?: T
+  $in?: T[]
+  $nin?: T[]
+  $contains?: T
+  $startswith?: T
+  $endswith?: T
+  $like?: T
+  $null?: boolean
+  $notnull?: boolean
+}
+
+export type NumberOperators<T = number> = {
+  $eq?: T
+  $ne?: T
+  $gt?: T
+  $gte?: T
+  $lt?: T
+  $lte?: T
+  $in?: T[]
+  $nin?: T[]
+  $null?: boolean
+  $notnull?: boolean
+}
+
+export type BooleanOperators = {
+  $eq?: boolean
+  $ne?: boolean
+  $null?: boolean
+  $notnull?: boolean
+}
+
+export type DateOperators = {
+  $eq?: Date | string
+  $ne?: Date | string
+  $gt?: Date | string
+  $gte?: Date | string
+  $lt?: Date | string
+  $lte?: Date | string
+  $in?: (Date | string)[]
+  $nin?: (Date | string)[]
+  $null?: boolean
+  $notnull?: boolean
+  // Dataverse-specific date functions
+  $today?: boolean
+  $yesterday?: boolean
+  $tomorrow?: boolean
+  $thisweek?: boolean
+  $thismonth?: boolean
+  $thisyear?: boolean
+  $lastweek?: boolean
+  $lastmonth?: boolean
+  $lastyear?: boolean
+  $nextweek?: boolean
+  $nextmonth?: boolean
+  $nextyear?: boolean
+  $lastxdays?: number
+  $nextxdays?: number
+  $lastxmonths?: number
+  $nextxmonths?: number
+  $lastxyears?: number
+  $nextxyears?: number
+}
+
+export type LookupOperators = {
+  $eq?: string  // GUID
+  $ne?: string
+  $in?: string[]
+  $nin?: string[]
+  $null?: boolean
+  $notnull?: boolean
+}
+
+// Type mapping for different attribute types
+export type FilterOperatorForType<T> = 
+  T extends string ? StringOperators<T> | T :
+  T extends number ? NumberOperators<T> | T :
+  T extends boolean ? BooleanOperators | T :
+  T extends Date ? DateOperators | T :
+  T extends string | Date ? DateOperators | T :
+  T extends (infer U)[] ? FilterOperatorForType<U> | U[] :
+  StringOperators<T> | T
+
+// Filter type that maps entity properties to appropriate operators
 export type ODataFilter<TEntity> = {
-  [K in keyof TEntity]?: any
+  [K in keyof TEntity]?: FilterOperatorForType<TEntity[K]>
 } & {
   $and?: ODataFilter<TEntity>[]
   $or?: ODataFilter<TEntity>[]
