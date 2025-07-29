@@ -64,6 +64,7 @@ export interface AttributeMetadata {
   }
   IsPrimaryId?: boolean
   IsPrimaryName?: boolean
+  AttributeOf?: string
 }
 
 export interface DataverseErrorResponse {

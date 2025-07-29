@@ -15,6 +15,7 @@ export interface TypeGenerationOptions {
   useExactTypes?: boolean
   includeLookupValues?: boolean
   includeBindingTypes?: boolean
+  excludeAuxiliaryAttributes?: boolean
 }
 
 /**
@@ -38,7 +39,8 @@ export function generateEntityInterface(
 ): string {
   const {
     entityPrefix = '',
-    includeComments = true
+    includeComments = true,
+    excludeAuxiliaryAttributes = true
   } = options
 
   const interfaceName = `${entityPrefix}${entityMetadata.schemaName}`
@@ -59,8 +61,13 @@ export function generateEntityInterface(
 
   lines.push(`export interface ${interfaceName} {`)
 
+  // Filter auxiliary attributes if configured
+  const attributesToGenerate = excludeAuxiliaryAttributes
+    ? entityMetadata.attributes.filter(attr => !attr.attributeOf)
+    : entityMetadata.attributes
+
   // Generate properties for each attribute
-  for (const attr of entityMetadata.attributes) {
+  for (const attr of attributesToGenerate) {
     const propertyLines = generateAttributeProperty(attr, options)
     lines.push(...propertyLines.map(line => `  ${line}`))
   }

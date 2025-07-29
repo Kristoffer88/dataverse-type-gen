@@ -49,6 +49,8 @@ export interface DataverseTypeGenConfig {
     indexFile?: boolean
     /** Generate React Query hooks alongside types */
     generateHooks?: boolean
+    /** Exclude auxiliary attributes (those with AttributeOf field) for cleaner interfaces */
+    excludeAuxiliaryAttributes?: boolean
   }
   
   
@@ -72,7 +74,8 @@ export const DEFAULT_CONFIG: DataverseTypeGenConfig = {
     includeLookupValues: true,
     includeBindingTypes: true,
     indexFile: true,
-    generateHooks: true
+    generateHooks: true,
+    excludeAuxiliaryAttributes: true // Default to true for cleaner interfaces
   }
 }
 
@@ -325,6 +328,7 @@ export function toCodeGenConfig(config: DataverseTypeGenConfig): CodeGenConfig {
       useExactTypes: config.typeGeneration.useExactTypes,
       includeLookupValues: config.typeGeneration.includeLookupValues,
       includeBindingTypes: config.typeGeneration.includeBindingTypes,
+      excludeAuxiliaryAttributes: config.typeGeneration.excludeAuxiliaryAttributes,
     }
   }
 }

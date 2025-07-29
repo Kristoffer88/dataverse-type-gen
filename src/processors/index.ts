@@ -84,6 +84,7 @@ export interface ProcessedAttributeMetadata {
   requiredLevel: 'None' | 'SystemRequired' | 'ApplicationRequired' | 'Recommended'
   isPrimaryId: boolean
   isPrimaryName: boolean
+  attributeOf?: string // For auxiliary attribute filtering
   // Type-specific properties
   maxLength?: number
   minValue?: number
@@ -199,7 +200,10 @@ export function processEntityMetadata(entityMetadata: EntityDefinition): Process
   
   // Process attributes if available
   if (entityMetadata.Attributes) {
-    processed.attributes = entityMetadata.Attributes.map(attr => processAttributeMetadata(attr))
+    const allProcessedAttributes = entityMetadata.Attributes.map(attr => processAttributeMetadata(attr))
+    
+    // Store all attributes initially (filtering will be applied during generation if configured)
+    processed.attributes = allProcessedAttributes
     
     // Extract option sets from attributes
     processed.optionSets = extractOptionSetsFromAttributes(entityMetadata.Attributes)
@@ -340,7 +344,8 @@ export function processAttributeMetadata(attributeMetadata: AttributeMetadata): 
     isValidForUpdate: attributeMetadata.IsValidForUpdate,
     requiredLevel: extractRequiredLevel(attributeMetadata.RequiredLevel),
     isPrimaryId: attributeMetadata.IsPrimaryId || false,
-    isPrimaryName: attributeMetadata.IsPrimaryName || false
+    isPrimaryName: attributeMetadata.IsPrimaryName || false,
+    attributeOf: attributeMetadata.AttributeOf
   }
   
   // Handle type-specific properties
@@ -619,6 +624,17 @@ export function getOptionSetAttributes(attributes: ProcessedAttributeMetadata[])
     attr.attributeType === 'State' ||
     attr.attributeType === 'Status'
   )
+}
+
+/**
+ * Filter out auxiliary attributes using AttributeOf field
+ * Auxiliary attributes are system-generated fields like lookup name fields that reference other attributes
+ * 
+ * @param attributes - Array of processed attribute metadata
+ * @returns Filtered array without auxiliary attributes
+ */
+export function filterAuxiliaryAttributes(attributes: ProcessedAttributeMetadata[]): ProcessedAttributeMetadata[] {
+  return attributes.filter(attr => !attr.attributeOf)
 }
 
 /**

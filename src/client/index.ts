@@ -370,8 +370,8 @@ export async function fetchEntityAttributes(
 ): Promise<AttributeMetadata[]> {
   
   try {
-    // First fetch all attributes with basic information
-    const basicUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,Description,AttributeType,IsCustomAttribute,IsValidForCreate,IsValidForRead,IsValidForUpdate,RequiredLevel,IsPrimaryId,IsPrimaryName`
+    // First fetch all attributes with basic information including AttributeOf for auxiliary filtering
+    const basicUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,Description,AttributeType,IsCustomAttribute,IsValidForCreate,IsValidForRead,IsValidForUpdate,RequiredLevel,IsPrimaryId,IsPrimaryName,AttributeOf`
     
     const basicResponse = await authenticatedFetch(basicUrl, { method: 'GET' })
     
