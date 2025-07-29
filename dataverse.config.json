@@ -8,6 +8,7 @@
   "publisher": "pum",
   "generateRelatedEntities": true,
   "maxRelatedEntityDepth": 1,
+  "nestedExpand": false,
   "typeGeneration": {
     "useExactTypes": true,
     "generateHooks": true,

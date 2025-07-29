@@ -329,6 +329,7 @@ export function toCodeGenConfig(config: DataverseTypeGenConfig): CodeGenConfig {
       includeLookupValues: config.typeGeneration.includeLookupValues,
       includeBindingTypes: config.typeGeneration.includeBindingTypes,
       excludeAuxiliaryAttributes: config.typeGeneration.excludeAuxiliaryAttributes,
+      nestedExpand: config.nestedExpand,
     }
   }
 }

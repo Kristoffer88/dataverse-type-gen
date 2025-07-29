@@ -16,6 +16,7 @@ export interface TypeGenerationOptions {
   includeLookupValues?: boolean
   includeBindingTypes?: boolean
   excludeAuxiliaryAttributes?: boolean
+  nestedExpand?: boolean
 }
 
 /**
@@ -595,7 +596,7 @@ function generateExpandTypes(
   options: TypeGenerationOptions = {},
   allEntities: ProcessedEntityMetadata[] = []
 ): { expandTypes: string, relatedEntityImports: string[] } {
-  const { includeComments = true } = options
+  const { includeComments = true, nestedExpand = false } = options
   const lines: string[] = []
   const schemaName = entityMetadata.schemaName
   const relatedEntityImports: string[] = []
@@ -637,54 +638,69 @@ function generateExpandTypes(
   
   // Generate expand type with both array and object support
   const expandTypeName = `${schemaName}Expand`
-  lines.push(`export type ${expandTypeName} =`)
-  lines.push(`  | ${expandablePropsTypeName}[]`) // Array format
-  lines.push(`  | ${schemaName}TypeSafeExpand`) // Type-safe object format
+  
+  if (nestedExpand) {
+    // Advanced mode: Full type-safe expand support with all related entity imports
+    lines.push(`export type ${expandTypeName} =`)
+    lines.push(`  | ${expandablePropsTypeName}[]`) // Array format
+    lines.push(`  | ${schemaName}TypeSafeExpand`) // Type-safe object format
 
-  lines.push('')
-  
-  if (includeComments) {
-    lines.push(`/**`)
-    lines.push(` * Type-safe expand with target entity field awareness`)
-    lines.push(` * $select shows actual field names from target entities`)
-    lines.push(` */`)
-  }
-  
-  // Generate type-safe expand type that maps relationships to target entity types
-  lines.push(`export type ${schemaName}TypeSafeExpand = {`)
-  
-  // Generate type mappings for each relationship
-  if (Object.keys(entityMetadata.relatedEntities).length > 0) {
-    // Add imports for query types (only add once)
-    if (!relatedEntityImports.some(imp => imp.includes('ODataFilter'))) {
-      relatedEntityImports.push(`import type { ODataFilter, ODataOrderBy } from './query-types.js'`)
+    lines.push('')
+    
+    if (includeComments) {
+      lines.push(`/**`)
+      lines.push(` * Type-safe expand with target entity field awareness`)
+      lines.push(` * $select shows actual field names from target entities`)
+      lines.push(` */`)
     }
     
-    Object.entries(entityMetadata.relatedEntities).forEach(([relationshipName, info]) => {
-      // Look up the actual schema name from the processed entities using our metadata lookup
-      const relatedEntity = entityLookup.get(info.targetEntityLogicalName)
-      if (!relatedEntity) {
-        throw new Error(`Entity metadata not found for target entity: ${info.targetEntityLogicalName}. This entity should be included in the allEntities array passed to generateExpandTypes.`)
-      }
-      const targetSchemaName = relatedEntity.schemaName
-      
-      // Add import for the target entity type (skip self-references)
-      if (info.targetEntityLogicalName !== entityMetadata.logicalName) {
-        // Use the actual filename (lowercase schema name) for the import path
-        const targetFileName = relatedEntity.schemaName.toLowerCase()
-        relatedEntityImports.push(`import type { ${targetSchemaName} } from './${targetFileName}.js'`)
+    // Generate type-safe expand type that maps relationships to target entity types
+    lines.push(`export type ${schemaName}TypeSafeExpand = {`)
+    
+    // Generate type mappings for each relationship
+    if (Object.keys(entityMetadata.relatedEntities).length > 0) {
+      // Add imports for query types (only add once)
+      if (!relatedEntityImports.some(imp => imp.includes('ODataFilter'))) {
+        relatedEntityImports.push(`import type { ODataFilter, ODataOrderBy } from './query-types.js'`)
       }
       
-      lines.push(`  "${relationshipName}"?: {`)
-      lines.push(`    $select?: (keyof ${targetSchemaName})[]`)
-      lines.push(`    $filter?: ODataFilter<${targetSchemaName}>`)
-      lines.push(`    $orderby?: ODataOrderBy<${targetSchemaName}>`)
-      lines.push(`    $top?: number`)
-      lines.push(`  }`)
-    })
+      Object.entries(entityMetadata.relatedEntities).forEach(([relationshipName, info]) => {
+        // Look up the actual schema name from the processed entities using our metadata lookup
+        const relatedEntity = entityLookup.get(info.targetEntityLogicalName)
+        if (!relatedEntity) {
+          throw new Error(`Entity metadata not found for target entity: ${info.targetEntityLogicalName}. This entity should be included in the allEntities array passed to generateExpandTypes.`)
+        }
+        const targetSchemaName = relatedEntity.schemaName
+        
+        // Add import for the target entity type (skip self-references)
+        if (info.targetEntityLogicalName !== entityMetadata.logicalName) {
+          // Use the actual filename (lowercase schema name) for the import path
+          const targetFileName = relatedEntity.schemaName.toLowerCase()
+          relatedEntityImports.push(`import type { ${targetSchemaName} } from './${targetFileName}.js'`)
+        }
+        
+        lines.push(`  "${relationshipName}"?: {`)
+        lines.push(`    $select?: (keyof ${targetSchemaName})[]`)
+        lines.push(`    $filter?: ODataFilter<${targetSchemaName}>`)
+        lines.push(`    $orderby?: ODataOrderBy<${targetSchemaName}>`)
+        lines.push(`    $top?: number`)
+        lines.push(`  }`)
+      })
+    }
+    
+    lines.push(`}`)
+  } else {
+    // Simple mode: Basic expand support with minimal imports
+    lines.push(`export type ${expandTypeName} = ${expandablePropsTypeName}[]`)
+    
+    if (includeComments) {
+      lines.push('')
+      lines.push(`/**`)
+      lines.push(` * Basic expand options for ${entityMetadata.displayName}`)
+      lines.push(` * Use string array format: ["relationship1", "relationship2"]`)
+      lines.push(` */`)
+    }
   }
-  
-  lines.push(`}`)
   
   return {
     expandTypes: lines.join('\n'),
