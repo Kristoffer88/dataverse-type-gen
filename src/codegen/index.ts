@@ -923,7 +923,9 @@ export type ODataFilter<TEntity> = {
 
 export type ODataSelect<TEntity> = (keyof TEntity)[]
 
-export type ODataExpand<TMetadata = any> = string[] | Record<string, any>
+export type ODataExpand<TMetadata = any> = TMetadata extends { expandableProperties: readonly string[] }
+  ? TMetadata['expandableProperties'][number][] | Record<string, { $select?: string[], $filter?: any, $orderby?: any, $top?: number }>
+  : string[] | Record<string, any>
 
 export type ODataOrderBy<TEntity> = {
   [K in keyof TEntity]?: 'asc' | 'desc'

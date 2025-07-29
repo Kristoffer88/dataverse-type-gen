@@ -389,6 +389,9 @@ export function generateEntityFile(
     ? generateBindingTypes(entityMetadata, options)
     : undefined
 
+  // Generate expand types for type-safe $expand operations
+  const expandTypes = generateExpandTypes(entityMetadata, options)
+
   // Generate metadata object
   const metadata = options.includeMetadata 
     ? generateMetadataObject(entityMetadata, options)
@@ -397,6 +400,7 @@ export function generateEntityFile(
   // Combine all type definitions
   const allTypes = [
     interfaces,
+    expandTypes,
     bindingTypes,
     metadata
   ].filter(Boolean).join('\n\n')
@@ -583,6 +587,62 @@ function checkIfConstantIsUsed(): boolean {
   
   // For now, we only need the type imports, not the constants
   return false
+}
+
+/**
+ * Generate type-safe expand types for $expand operations
+ */
+function generateExpandTypes(
+  entityMetadata: ProcessedEntityMetadata,
+  options: TypeGenerationOptions = {}
+): string {
+  const { includeComments = true } = options
+  const lines: string[] = []
+  const schemaName = entityMetadata.schemaName
+  
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Type-safe expand properties for ${entityMetadata.displayName}`)
+    lines.push(` * Enables IntelliSense for $expand relationship names`)
+    lines.push(` */`)
+  }
+  
+  // Generate union type for expandable properties
+  const expandablePropsTypeName = `${schemaName}ExpandableProperties`
+  if (entityMetadata.expandableProperties.length > 0) {
+    lines.push(`export type ${expandablePropsTypeName} =`)
+    entityMetadata.expandableProperties.forEach((prop, index) => {
+      const isFirst = index === 0
+      const prefix = isFirst ? '  ' : '  | '
+      lines.push(`${prefix}"${prop}"`)
+    })
+  } else {
+    lines.push(`export type ${expandablePropsTypeName} = never`)
+  }
+  
+  lines.push('')
+  
+  if (includeComments) {
+    lines.push(`/**`)
+    lines.push(` * Type-safe expand options for ${entityMetadata.displayName}`)
+    lines.push(` * Supports both array format and object format with nested options`)
+    lines.push(` */`)
+  }
+  
+  // Generate expand type with both array and object support
+  const expandTypeName = `${schemaName}Expand`
+  lines.push(`export type ${expandTypeName} =`)
+  lines.push(`  | ${expandablePropsTypeName}[]`) // Array format
+  lines.push(`  | {`) // Object format
+  lines.push(`      [K in ${expandablePropsTypeName}]?: {`)
+  lines.push(`        $select?: string[]`)
+  lines.push(`        $filter?: any`)
+  lines.push(`        $orderby?: any`)
+  lines.push(`        $top?: number`)
+  lines.push(`      }`)
+  lines.push(`    }`)
+  
+  return lines.join('\n')
 }
 
 /**
