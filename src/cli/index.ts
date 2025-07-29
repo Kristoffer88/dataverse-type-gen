@@ -11,7 +11,7 @@ import {
   fetchSolutionEntities,
   fetchAllEntities 
 } from '../client/index.js'
-import { processEntityMetadata } from '../processors/index.js'
+import { processEntityMetadata, type ProcessedEntityMetadata } from '../processors/index.js'
 import { 
   generateMultipleEntityTypes,
   type CodeGenConfig 
@@ -30,6 +30,8 @@ interface CLIConfig {
   includeComments: boolean
   includeMetadata: boolean
   includeValidation: boolean
+  generateRelatedEntities: boolean
+  maxRelatedEntityDepth: number
   overwrite: boolean
   verbose: boolean
   debug: boolean
@@ -48,6 +50,8 @@ const DEFAULT_CLI_CONFIG: CLIConfig = {
   includeComments: true,
   includeMetadata: true,
   includeValidation: true,
+  generateRelatedEntities: false, // Default to false for CLI to avoid unexpected behavior
+  maxRelatedEntityDepth: 2,
   overwrite: true,
   verbose: false,
   debug: false,
@@ -353,6 +357,14 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
     // Load configuration
     const config = { ...DEFAULT_CLI_CONFIG, ...(await loadConfig(options.config as string)), ...options }
     
+    // Parse CLI-specific options that need type conversion
+    if (options.maxRelatedDepth) {
+      config.maxRelatedEntityDepth = parseInt(options.maxRelatedDepth as string, 10)
+    }
+    if (options.generateRelatedEntities !== undefined) {
+      config.generateRelatedEntities = Boolean(options.generateRelatedEntities)
+    }
+    
     // Validate inputs before proceeding
     await validateInputs(config, logger)
     
@@ -469,6 +481,70 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
 
     logger.success(`Successfully processed ${processedEntities.length} entities`)
 
+    // Fetch and process related entities if enabled
+    logger.debugLog(`DEBUG: This line should always execute!!!`)
+    let relatedEntities: ProcessedEntityMetadata[] = []
+    logger.debugLog(`DEBUG: About to check related entities`)
+    logger.debugLog(`Checking related entities: generateRelatedEntities=${config.generateRelatedEntities}, processedEntities.length=${processedEntities.length}`)
+    logger.debugLog(`Type of generateRelatedEntities: ${typeof config.generateRelatedEntities}`)
+    logger.debugLog(`Type of processedEntities.length: ${typeof processedEntities.length}`)
+    if (config.generateRelatedEntities && processedEntities.length > 0) {
+      logger.info(`🔗 Discovering related entities (max depth: ${config.maxRelatedEntityDepth})...`)
+      
+      // Collect all unique related entity logical names
+      const relatedEntityNames = new Set<string>()
+      const processedEntityNames = new Set(processedEntities.map(e => e.logicalName))
+      
+      for (const entity of processedEntities) {
+        logger.debugLog(`Entity ${entity.logicalName} has ${Object.keys(entity.relatedEntities).length} related entities`)
+        Object.values(entity.relatedEntities).forEach(relatedInfo => {
+          logger.debugLog(`  - Found related entity: ${relatedInfo.targetEntityLogicalName}`)
+          // Only add if not already processed as a primary entity and within depth limit
+          if (!processedEntityNames.has(relatedInfo.targetEntityLogicalName) && 
+              !relatedEntityNames.has(relatedInfo.targetEntityLogicalName)) {
+            relatedEntityNames.add(relatedInfo.targetEntityLogicalName)
+            logger.debugLog(`    -> Added to processing queue`)
+          } else {
+            logger.debugLog(`    -> Skipped (already processed or queued)`)
+          }
+        })
+      }
+      
+      if (relatedEntityNames.size > 0) {
+        logger.info(`📥 Found ${relatedEntityNames.size} related entities to process...`)
+        
+        const relatedEntityNamesArray = Array.from(relatedEntityNames)
+        for (let i = 0; i < relatedEntityNamesArray.length; i++) {
+          const entityName = relatedEntityNamesArray[i]
+          if (!loggerOptions.quiet) {
+            logger.progress(i + 1, relatedEntityNamesArray.length, `Related: ${entityName}`)
+          }
+          
+          try {
+            const rawMetadata = await fetchEntityMetadata(entityName, {
+              includeAttributes: true,
+              includeRelationships: true
+            })
+            
+            if (rawMetadata) {
+              const processed = processEntityMetadata(rawMetadata)
+              relatedEntities.push(processed)
+              logger.verboseDebug(`✅ Processed related entity ${entityName} (${processed.attributes.length} attributes)`)
+            } else {
+              logger.warning(`Related entity ${entityName} not found`)
+            }
+            
+          } catch (error) {
+            logger.warning(`Failed to process related entity ${entityName}: ${error instanceof Error ? error.message : String(error)}`)
+          }
+        }
+        
+        logger.success(`Successfully processed ${relatedEntities.length} related entities`)
+      } else {
+        logger.info('No related entities found to process')
+      }
+    }
+
     // Generate TypeScript files
     if (config.dryRun) {
       logger.info(`📋 Dry run: Would generate ${processedEntities.length} TypeScript files in ${config.outputDir}`)
@@ -497,7 +573,7 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
       }
     }
     
-    const result = await generateMultipleEntityTypes(processedEntities, codeGenConfig)
+    const result = await generateMultipleEntityTypes(processedEntities, codeGenConfig, relatedEntities)
     
     // Report results
     logger.success(`Generated ${result.successfulFiles} TypeScript files`)
@@ -730,6 +806,8 @@ export function setupCLI(): Command {
     .option('--no-metadata', 'Exclude metadata objects')
     .option('--no-validation', 'Exclude validation functions')
     .option('--no-overwrite', 'Do not overwrite existing files')
+    .option('--generate-related-entities', 'Generate metadata for related entities to enable type-safe nested expands')
+    .option('--max-related-depth <depth>', 'Maximum depth for related entity generation (prevents infinite recursion)', '2')
     .option('-c, --config <path>', 'Configuration file path')
     .option('-v, --verbose', 'Verbose output')
     .option('--debug', 'Enable debug mode with detailed logging')
@@ -744,7 +822,9 @@ Examples:
   $ dataverse-type-gen generate --entities account --output-dir ./src/types --debug
   $ dataverse-type-gen generate --dataverse-url https://yourorg.crm.dynamics.com --publisher prefix
   $ dataverse-type-gen generate --solution "My Custom Solution" --output-format json
-  $ dataverse-type-gen generate --config ./custom-config.json --verbose`)
+  $ dataverse-type-gen generate --config ./custom-config.json --verbose
+  $ dataverse-type-gen generate --entities pum_initiative --generate-related-entities --max-related-depth 3
+  $ dataverse-type-gen generate --publisher pum --generate-related-entities`)
     .action(generateCommand)
   
   // Init command

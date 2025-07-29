@@ -5,7 +5,6 @@
 
 import { describe, test, expect, beforeAll } from 'vitest'
 import { 
-  configureFetch,
   DataverseUrls,
   configureDataverseUrls,
   createAuthenticatedFetcher
@@ -36,10 +35,6 @@ beforeAll(async () => {
     instanceUrl: DATAVERSE_URL,
     apiVersion: 'v9.1'
   })
-  
-  // Configure authenticated fetch
-  const authenticatedFetch = createAuthenticatedFetcher()
-  configureFetch(authenticatedFetch as (input: string | URL | Request, init?: RequestInit) => Promise<Response>)
 })
 
 describe('React Query Hooks Integration', () => {

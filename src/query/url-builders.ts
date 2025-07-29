@@ -55,9 +55,12 @@ export function buildEntityUrl<TEntity>(
   }
   
   // Add expand parameter
-  if ($expand && $expand.length > 0) {
-    if (Array.isArray($expand)) {
+  if ($expand) {
+    if (Array.isArray($expand) && $expand.length > 0) {
       params.append('$expand', $expand.join(','))
+    } else if (typeof $expand === 'object' && Object.keys($expand).length > 0) {
+      // Handle object format - for now just use keys, full implementation would be in buildExpand
+      params.append('$expand', Object.keys($expand).join(','))
     }
   }
   
@@ -100,9 +103,12 @@ export function buildEntitySetUrl<TEntity>(
   }
   
   // Add expand parameter
-  if ($expand && $expand.length > 0) {
-    if (Array.isArray($expand)) {
+  if ($expand) {
+    if (Array.isArray($expand) && $expand.length > 0) {
       params.append('$expand', $expand.join(','))
+    } else if (typeof $expand === 'object' && Object.keys($expand).length > 0) {
+      // Handle object format - for now just use keys, full implementation would be in buildExpand
+      params.append('$expand', Object.keys($expand).join(','))
     }
   }
   

@@ -13,6 +13,16 @@ import type {
 } from '../client/index.js'
 
 /**
+ * Related entity information for type-safe nested expands
+ */
+export interface RelatedEntityInfo {
+  relationshipName: string // e.g., "pum_program"
+  targetEntityLogicalName: string // e.g., "pum_program" 
+  targetEntitySetName: string // e.g., "pum_programs"
+  relationshipType: 'OneToMany' | 'ManyToOne' | 'ManyToMany'
+}
+
+/**
  * Processed entity metadata for type generation
  */
 export interface ProcessedEntityMetadata {
@@ -30,6 +40,8 @@ export interface ProcessedEntityMetadata {
   oneToManyRelationships: ProcessedRelationshipMetadata[]
   manyToOneRelationships: ProcessedRelationshipMetadata[]
   manyToManyRelationships: ProcessedManyToManyRelationshipMetadata[]
+  /** Related entities with their full metadata for type-safe expands */
+  relatedEntities: Record<string, RelatedEntityInfo>
 }
 
 /**
@@ -181,7 +193,8 @@ export function processEntityMetadata(entityMetadata: EntityDefinition): Process
     expandableProperties: [],
     oneToManyRelationships: [],
     manyToOneRelationships: [],
-    manyToManyRelationships: []
+    manyToManyRelationships: [],
+    relatedEntities: {}
   }
   
   // Process attributes if available
@@ -194,7 +207,7 @@ export function processEntityMetadata(entityMetadata: EntityDefinition): Process
     // Extract expandable properties (lookup fields for many-to-one relationships)
     const lookupFields = processed.attributes
       .filter(attr => attr.attributeType === 'Lookup')
-      .map(attr => attr.logicalName)
+      .map(attr => attr.schemaName)
     
     processed.expandableProperties = [...lookupFields]
   }
@@ -242,7 +255,73 @@ export function processEntityMetadata(entityMetadata: EntityDefinition): Process
     processed.expandableProperties.push(...manyToManyNames)
   }
   
+  // Build related entities info from relationships and lookup attributes
+  processed.relatedEntities = buildRelatedEntitiesInfo(processed)
+  
   return processed
+}
+
+/**
+ * Build related entities information for type-safe expands
+ */
+function buildRelatedEntitiesInfo(primaryEntity: ProcessedEntityMetadata): Record<string, RelatedEntityInfo> {
+  const relatedEntities: Record<string, RelatedEntityInfo> = {}
+
+  // Process lookup attributes (many-to-one relationships)
+  for (const attr of primaryEntity.attributes) {
+    if (attr.attributeType === 'Lookup' && attr.targets) {
+      for (const targetEntity of attr.targets) {
+        const relationshipName = attr.logicalName.replace(/_value$/, '')
+        relatedEntities[relationshipName] = {
+          relationshipName,
+          targetEntityLogicalName: targetEntity,
+          targetEntitySetName: `${targetEntity}s`, // Will be corrected when we have actual metadata
+          relationshipType: 'ManyToOne'
+        }
+      }
+    }
+  }
+
+  // Process one-to-many relationships
+  for (const rel of primaryEntity.oneToManyRelationships) {
+    relatedEntities[rel.schemaName] = {
+      relationshipName: rel.schemaName,
+      targetEntityLogicalName: rel.referencingEntity,
+      targetEntitySetName: `${rel.referencingEntity}s`, // Will be corrected when we have actual metadata
+      relationshipType: 'OneToMany'
+    }
+  }
+
+  // Process many-to-many relationships
+  for (const rel of primaryEntity.manyToManyRelationships) {
+    // Determine the target entity (the one that's not the current entity)
+    const targetEntity = rel.entity1LogicalName === primaryEntity.logicalName 
+      ? rel.entity2LogicalName 
+      : rel.entity1LogicalName
+    
+    relatedEntities[rel.schemaName] = {
+      relationshipName: rel.schemaName,
+      targetEntityLogicalName: targetEntity,
+      targetEntitySetName: `${targetEntity}s`, // Will be corrected when we have actual metadata
+      relationshipType: 'ManyToMany'
+    }
+  }
+
+  return relatedEntities
+}
+
+/**
+ * Extract all related entity names from processed metadata
+ */
+export function extractRelatedEntityNames(metadata: ProcessedEntityMetadata): string[] {
+  const relatedEntityNames = new Set<string>()
+
+  // From related entities info
+  for (const relatedEntity of Object.values(metadata.relatedEntities)) {
+    relatedEntityNames.add(relatedEntity.targetEntityLogicalName)
+  }
+
+  return Array.from(relatedEntityNames)
 }
 
 /**

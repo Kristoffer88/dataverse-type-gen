@@ -31,16 +31,37 @@ export function generateEntityHooks(
   lines.push(`import { ${interfaceName}Metadata } from '../${entityMetadata.logicalName}.js'`)
   lines.push(`import type { ${interfaceName} } from '../${entityMetadata.logicalName}.js'`)
   lines.push(`import type {`)
-  lines.push(`  ODataFilter,`)
-  lines.push(`  ODataSelect,`)
-  lines.push(`  ODataExpand,`)
-  lines.push(`  ODataOrderBy,`)
-  lines.push(`  ODataResponse,`)
-  lines.push(`  EntityListOptions,`)
-  lines.push(`  EntityListOptionsWithMetadata,`)
-  lines.push(`  ExpandablePropertiesOf`)
-  lines.push(`} from 'dataverse-type-gen'`)
+  lines.push(`    ODataFilter,`)
+  lines.push(`    ODataSelect,`)
+  lines.push(`    ODataExpand,`)
+  lines.push(`    ODataOrderBy,`)
+  lines.push(`    ODataResponse,`)
+  lines.push(`    EntityListOptions,`)
+  lines.push(`    EntityOptions`)
+  lines.push(`} from '../query-types.js'`)
   lines.push(`import { ${pascalTypeName}Queries } from '../queries/${entityMetadata.logicalName}.queries.js'`)
+  
+  // Import related entity types for type-safe expands (only if they exist)
+  // NOTE: We skip generating imports for related entities that don't have type files
+  // This prevents import errors when only a subset of entities are being generated
+  const relatedEntityImports = new Set<string>()
+  
+  // Only generate imports if we have explicit knowledge of what entities are available
+  // For now, we comment out automatic related entity imports to prevent missing file errors
+  // Future enhancement: Pass available entities list to conditionally generate imports
+  
+  /*
+  for (const [, relatedInfo] of Object.entries(entityMetadata.relatedEntities)) {
+    const relatedTypeName = toPascalCaseTypeName(relatedInfo.targetEntityLogicalName)
+    relatedEntityImports.add(`import type { ${relatedTypeName} } from '../${relatedInfo.targetEntityLogicalName}.js'`)
+  }
+  */
+  
+  if (relatedEntityImports.size > 0) {
+    lines.push('')
+    lines.push(`// Related entity imports for type-safe expands`)
+    Array.from(relatedEntityImports).sort().forEach(importLine => lines.push(importLine))
+  }
   
   // Import option set constants for examples
   const stateAttribute = entityMetadata.attributes.find(attr => attr.logicalName === 'statecode')
@@ -57,37 +78,12 @@ export function generateEntityHooks(
   
   if (includeComments) {
     lines.push(`/**`)
-    lines.push(` * Global fetch function - configure this with your authenticated fetch client`)
-    lines.push(` * `)
-    lines.push(` * @example`)
-    lines.push(` * import { configureFetch } from './hooks/${entityMetadata.logicalName}.hooks'`)
-    lines.push(` * `)
-    lines.push(` * // Configure with authenticated fetch`)
-    lines.push(` * configureFetch(authenticatedFetch)`)
+    lines.push(` * Uses standard fetch - authentication handled by dataverse-utilities or model-driven apps`)
     lines.push(` */`)
-  } else {
-    lines.push(`// Global fetch function - configure this with your authenticated fetch`)
   }
-  lines.push(`let globalFetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response> = fetch`)
-  lines.push(``)
-  lines.push(`export function configureFetch(fetchFn: typeof fetch): void {`)
-  lines.push(`  globalFetch = fetchFn`)
-  lines.push(`}`)
   lines.push(``)
   
-  // Types are imported from dataverse-type-gen library
-  
-  // Type-safe options using entity metadata
-  if (includeComments) {
-    lines.push(`/** Options for single entity queries with type-safe expand */`)
-  }
-  lines.push(`type EntityOptions<T> = {`)
-  lines.push(`  /** Select specific fields (provides IntelliSense) */`)
-  lines.push(`  $select?: ODataSelect<T>`)
-  lines.push(`  /** Expand related entities (type-safe to actual lookup fields and relationships) */`)
-  lines.push(`  $expand?: ExpandablePropertiesOf<typeof ${interfaceName}Metadata>`)
-  lines.push(`}`)
-  lines.push(``)
+  // Types are imported from query-types.js - no need to redefine locally
   
   // =====================================================================
   // React Query Hooks (using generated query builders)
@@ -130,9 +126,9 @@ export function generateEntityHooks(
   lines.push(`  /** Key for single entity queries */`)
   lines.push(`  detail: (id: string) => [...${pascalTypeName}QueryKeys.all, 'detail', id] as const,`)
   lines.push(`  /** Key for entity list queries */`)
-  lines.push(`  list: (options?: EntityListOptionsWithMetadata<${interfaceName}, typeof ${interfaceName}Metadata>) => [...${pascalTypeName}QueryKeys.all, 'list', options] as const,`)
+  lines.push(`  list: (options?: EntityListOptions<${interfaceName}>) => [...${pascalTypeName}QueryKeys.all, 'list', options] as const,`)
   lines.push(`  /** Key for entity count queries */`)
-  lines.push(`  count: (options?: EntityListOptionsWithMetadata<${interfaceName}, typeof ${interfaceName}Metadata>) => [...${pascalTypeName}QueryKeys.all, 'count', options] as const,`)
+  lines.push(`  count: (options?: EntityListOptions<${interfaceName}>) => [...${pascalTypeName}QueryKeys.all, 'count', options] as const,`)
   lines.push(`}`)
   
   return lines.join('\n')
@@ -176,8 +172,8 @@ function generateSingleEntityHook(
   }
   
   lines.push(`export function use${pascalTypeName}(`)
-  lines.push(`  id: string | undefined,`)
-  lines.push(`  options: EntityOptions<${interfaceName}> & Omit<UseQueryOptions<${interfaceName}>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`    id: string | undefined,`)
+  lines.push(`    options: EntityOptions<${interfaceName}> & Omit<UseQueryOptions<${interfaceName}>, 'queryKey' | 'queryFn'> = {}`)
   lines.push(`): UseQueryResult<${interfaceName}> {`)
   lines.push(`  const { $select, $expand, ...queryOptions } = options`)
   lines.push(`  `)
@@ -187,7 +183,7 @@ function generateSingleEntityHook(
   lines.push(`      if (!id) throw new Error('ID is required')`)
   lines.push(`      `)
   lines.push(`      const url = ${pascalTypeName}Queries.buildEntityUrl(id, { $select, $expand })`)
-  lines.push(`      const response = await globalFetch(url)`)
+  lines.push(`      const response = await fetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
   lines.push(`        throw new Error(\`Failed to fetch ${entityMetadata.displayName}: \${response.statusText}\`)`)
@@ -250,7 +246,7 @@ function generateEntityListHook(
   }
   
   lines.push(`export function use${pascalTypeName}List(`)
-  lines.push(`  options: EntityListOptionsWithMetadata<${interfaceName}, typeof ${interfaceName}Metadata> & Omit<UseQueryOptions<ODataResponse<${interfaceName}>>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`    options: EntityListOptions<${interfaceName}> & Omit<UseQueryOptions<ODataResponse<${interfaceName}>>, 'queryKey' | 'queryFn'> = {}`)
   lines.push(`): UseQueryResult<ODataResponse<${interfaceName}>> {`)
   lines.push(`  const { $filter, $select, $expand, $orderby, $top, $skip, ...queryOptions } = options`)
   lines.push(`  `)
@@ -258,7 +254,7 @@ function generateEntityListHook(
   lines.push(`    queryKey: ${pascalTypeName}QueryKeys.list({ $filter, $select, $expand, $orderby, $top, $skip }),`)
   lines.push(`    queryFn: async (): Promise<ODataResponse<${interfaceName}>> => {`)
   lines.push(`      const url = ${pascalTypeName}Queries.buildListUrl({ $filter, $select, $expand, $orderby, $top, $skip })`)
-  lines.push(`      const response = await globalFetch(url)`)
+  lines.push(`      const response = await fetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
   lines.push(`        throw new Error(\`Failed to fetch ${entityMetadata.displayName} list: \${response.statusText}\`)`)
@@ -296,7 +292,7 @@ function generateEntityCountHook(
   }
   
   lines.push(`export function use${pascalTypeName}Count(`)
-  lines.push(`  options: Pick<EntityListOptionsWithMetadata<${interfaceName}, typeof ${interfaceName}Metadata>, '$filter'> & Omit<UseQueryOptions<number>, 'queryKey' | 'queryFn'> = {}`)
+  lines.push(`    options: Pick<EntityListOptions<${interfaceName}>, '$filter'> & Omit<UseQueryOptions<number>, 'queryKey' | 'queryFn'> = {}`)
   lines.push(`): UseQueryResult<number> {`)
   lines.push(`  const { $filter, ...queryOptions } = options`)
   lines.push(`  `)
@@ -304,7 +300,7 @@ function generateEntityCountHook(
   lines.push(`    queryKey: ${pascalTypeName}QueryKeys.count({ $filter }),`)
   lines.push(`    queryFn: async (): Promise<number> => {`)
   lines.push(`      const url = ${pascalTypeName}Queries.buildCountUrl({ $filter })`)
-  lines.push(`      const response = await globalFetch(url)`)
+  lines.push(`      const response = await fetch(url)`)
   lines.push(`      `)
   lines.push(`      if (!response.ok) {`)
   lines.push(`        throw new Error(\`Failed to count ${entityMetadata.displayName}: \${response.statusText}\`)`)
@@ -355,8 +351,8 @@ export function generateEntityQueryBuilders(
   lines.push(`    ODataExpand,`)
   lines.push(`    ODataOrderBy,`)
   lines.push(`    EntityListOptions,`)
-  lines.push(`    ExpandablePropertiesOf`)
-  lines.push(`} from 'dataverse-type-gen'`)
+  lines.push(`    EntityOptions`)
+  lines.push(`} from '../query-types.js'`)
   lines.push('')
   
   // Generate helper functions
@@ -421,15 +417,7 @@ export function generateEntityQueryBuilders(
  * Generate the helper functions used by query builders
  */
 function generateQueryHelperFunctions(lines: string[], interfaceName: string): void {
-  // EntityOptions type with type-safe expand
-  lines.push(`/** Options for single entity queries with type-safe expand */`)
-  lines.push(`type EntityOptions<T> = {`)
-  lines.push(`    /** Select specific fields (provides IntelliSense) */`)
-  lines.push(`    $select?: ODataSelect<T>`)
-  lines.push(`    /** Expand related entities (type-safe to actual lookup fields and relationships) */`)
-  lines.push(`    $expand?: ExpandablePropertiesOf<typeof ${interfaceName}Metadata>`)
-  lines.push(`}`)
-  lines.push('')
+  // Types are imported, no need to redefine
   
   // OData operators
   lines.push(`const odataOperators = {`)
@@ -495,6 +483,79 @@ function generateQueryHelperFunctions(lines: string[], interfaceName: string): v
   lines.push(`}`)
   lines.push('')
   
+  // Enhanced build expand function with metadata validation
+  lines.push(`// Build OData expand string with support for nested selects and relationship validation`)
+  lines.push(`const buildExpand = (expand: any): string => {`)
+  lines.push(`    if (Array.isArray(expand)) {`)
+  lines.push(`        // Simple array format: ['rel1', 'rel2'] - validate against expandable properties`)
+  lines.push(`        for (const relationshipName of expand) {`)
+  lines.push(`            if (!${interfaceName}Metadata.expandableProperties.includes(relationshipName as any)) {`)
+  lines.push(`                throw new Error(\`Unknown relationship '\${relationshipName}'. Available relationships: \${${interfaceName}Metadata.expandableProperties.join(', ')}\`)`)
+  lines.push(`            }`)
+  lines.push(`        }`)
+  lines.push(`        return expand.join(',')`)
+  lines.push(`    }`)
+  lines.push(`    `)
+  lines.push(`    if (typeof expand === 'object' && expand !== null) {`)
+  lines.push(`        // Object format: { rel1: { $select: ['field1'] }, rel2: { $select: ['field2'] } }`)
+  lines.push(`        return Object.entries(expand)`)
+  lines.push(`            .map(([relationshipName, options]: [string, any]) => {`)
+  lines.push(`                // Validate relationship exists`)
+  lines.push(`                if (!${interfaceName}Metadata.expandableProperties.includes(relationshipName as any)) {`)
+  lines.push(`                    throw new Error(\`Unknown relationship '\${relationshipName}'. Available relationships: \${${interfaceName}Metadata.expandableProperties.join(', ')}\`)`)
+  lines.push(`                }`)
+  lines.push(`                `)
+  lines.push(`                if (!options || typeof options !== 'object') {`)
+  lines.push(`                    return relationshipName`)
+  lines.push(`                }`)
+  lines.push(`                `)
+  lines.push(`                const nestedParams: string[] = []`)
+  lines.push(`                if (options.$select && Array.isArray(options.$select)) {`)
+  lines.push(`                    nestedParams.push(\`$select=\${options.$select.join(',')}\`)`)
+  lines.push(`                }`)
+  lines.push(`                if (options.$filter) {`)
+  lines.push(`                    nestedParams.push(\`$filter=\${buildExpandFilter(options.$filter)}\`)`)
+  lines.push(`                }`)
+  lines.push(`                if (options.$orderby) {`)
+  lines.push(`                    const orderBy = typeof options.$orderby === 'object' && !Array.isArray(options.$orderby)`)
+  lines.push(`                        ? Object.entries(options.$orderby).map(([field, dir]) => \`\${field} \${dir}\`).join(', ')`)
+  lines.push(`                        : Array.isArray(options.$orderby) ? options.$orderby.join(', ') : options.$orderby`)
+  lines.push(`                    nestedParams.push(\`$orderby=\${orderBy}\`)`)
+  lines.push(`                }`)
+  lines.push(`                if (options.$top !== undefined) {`)
+  lines.push(`                    nestedParams.push(\`$top=\${options.$top}\`)`)
+  lines.push(`                }`)
+  lines.push(`                `)
+  lines.push(`                return nestedParams.length > 0 `)
+  lines.push(`                    ? \`\${relationshipName}(\${nestedParams.join(';')})\``)
+  lines.push(`                    : relationshipName`)
+  lines.push(`            })`)
+  lines.push(`            .join(',')`)
+  lines.push(`    }`)
+  lines.push(`    `)
+  lines.push(`    return String(expand)`)
+  lines.push(`}`)
+  lines.push('')
+  
+  // Simple filter builder for expand filters (simplified version)
+  lines.push(`// Build filter for expand operations (simplified)`)
+  lines.push(`const buildExpandFilter = (filter: any): string => {`)
+  lines.push(`    if (typeof filter === 'object' && filter !== null) {`)
+  lines.push(`        return Object.entries(filter)`)
+  lines.push(`            .map(([field, value]) => {`)
+  lines.push(`                if (typeof value === 'object' && value !== null) {`)
+  lines.push(`                    return Object.entries(value)`)
+  lines.push(`                        .map(([op, val]) => \`\${field} \${op.replace('$', '')} \${formatValue(val)}\`)`)
+  lines.push(`                        .join(' and ')`)
+  lines.push(`                }`)
+  lines.push(`                return \`\${field} eq \${formatValue(value)}\``)
+  lines.push(`            })`)
+  lines.push(`            .join(' and ')`)
+  lines.push(`    }`)
+  lines.push(`    return String(filter)`)
+  lines.push(`}`)
+  lines.push('')
+  
   // Build OData URL function
   lines.push(`// Build complete OData URL with query parameters`)
   lines.push(`const buildODataUrl = <T>(entitySet: string, options: EntityListOptions<T> = {}, id?: string): string => {`)
@@ -503,7 +564,7 @@ function generateQueryHelperFunctions(lines: string[], interfaceName: string): v
   lines.push(``)
   lines.push(`    const queryParams = [`)
   lines.push(`        options.$select && \`$select=\${options.$select.join(',')}\`,`)
-  lines.push(`        options.$expand && \`$expand=\${options.$expand.join(',')}\`,`)
+  lines.push(`        options.$expand && \`$expand=\${buildExpand(options.$expand)}\`,`)
   lines.push(`        options.$filter && \`$filter=\${buildFilter<T>(options.$filter)}\`,`)
   lines.push(`        options.$orderby && \`$orderby=\${buildOrderBy<T>(options.$orderby)}\`,`)
   lines.push(`        options.$top !== undefined && \`$top=\${options.$top}\`,`)
@@ -635,7 +696,7 @@ export function generateHooksIndex(
   
   // Export common utilities
   lines.push(`// Common utilities`)
-  lines.push(`export { configureFetch, createEntityHooks, invalidateEntityQueries } from 'dataverse-type-gen'`)
+  lines.push(`export { createEntityHooks, invalidateEntityQueries } from 'dataverse-type-gen'`)
   
   return lines.join('\n')
 }
@@ -657,11 +718,7 @@ export function generateHooksDocumentation(
   lines.push('')
   lines.push(`\`\`\`typescript`)
   lines.push(`import { QueryClient, QueryClientProvider } from '@tanstack/react-query'`)
-  lines.push(`import { configureFetch, createAuthenticatedFetcher } from 'dataverse-type-gen'`)
-  lines.push('')
-  lines.push(`// Configure authentication`)
-  lines.push(`const authenticatedFetch = createAuthenticatedFetcher()`)
-  lines.push(`configureFetch(authenticatedFetch)`)
+  lines.push(`// Authentication is handled automatically by dataverse-utilities or model-driven apps`)
   lines.push('')
   lines.push(`// Create query client`)
   lines.push(`const queryClient = new QueryClient()`)

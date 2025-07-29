@@ -101,17 +101,49 @@ export type ODataFilter<TEntity> = {
 // Select specific fields from entity
 export type ODataSelect<TEntity> = (keyof TEntity)[]
 
-// Base expand type for entities without metadata
-export type ODataExpand = string[]
+// Nested expand options for individual expanded entities
+export type ExpandOptions = {
+  $select?: string[]
+  $filter?: Record<string, any>
+  $orderby?: Record<string, 'asc' | 'desc'> | string[]
+  $top?: number
+}
 
-// Type-safe expand using entity metadata
-export type ODataExpandWithMetadata<TMetadata extends { expandableProperties: readonly string[] }> = 
-  TMetadata['expandableProperties'][number][]
+// Helper type to extract entity interface from metadata
+type EntityFromMetadata<TMeta> = TMeta extends { attributes: readonly any[] } ? {
+  [K in TMeta['attributes'][number]['logicalName']]: any
+} : any
+
+// Type for individual expand options with target entity awareness
+export type RelationshipExpandOption<TTargetEntity = any> = {
+  $select?: (keyof TTargetEntity)[]
+  $filter?: ODataFilter<TTargetEntity>  
+  $orderby?: ODataOrderBy<TTargetEntity>
+  $top?: number
+}
+
+// Generic expand object that works with any relationship
+export type ExpandObject = Record<string, RelationshipExpandOption>
+
+// Main type that maps relationship names to their target entity types
+export type TypeSafeExpand<TEntityMetadata> = TEntityMetadata extends {
+  relatedEntities: infer TRelated
+} ? {
+  [K in keyof TRelated]?: TRelated[K] extends { targetEntityLogicalName: string }
+    ? RelationshipExpandOption<any> // Will be properly typed in generated code
+    : never
+} : ExpandObject // Fallback for when metadata isn't available
+
+// Base expand type - supports both simple arrays and nested object syntax
+export type ODataExpand<TEntityMetadata = any> = 
+  | string[] // Simple array format: ['rel1', 'rel2'] 
+  | TypeSafeExpand<TEntityMetadata> // Type-safe object format
+  | ExpandObject // Generic object format fallback
 
 // Helper type to extract expandable properties from entity with metadata
-export type ExpandablePropertiesOf<T> = T extends { expandableProperties: readonly string[] } 
-  ? T['expandableProperties'][number][]
-  : string[]
+export type ExpandablePropertiesOf<T> = T extends { relatedEntities: any } 
+  ? ODataExpand<T>
+  : string[] | Record<string, ExpandOptions>
 
 // Order by with direction
 export type ODataOrderBy<TEntity> = {
@@ -119,10 +151,10 @@ export type ODataOrderBy<TEntity> = {
 } | string[]
 
 // Complete OData query options
-export interface ODataQueryOptions<TEntity> {
+export interface ODataQueryOptions<TEntity, TMetadata = any> {
   $filter?: ODataFilter<TEntity>
   $select?: ODataSelect<TEntity>
-  $expand?: ODataExpand
+  $expand?: ODataExpand<TMetadata>
   $orderby?: ODataOrderBy<TEntity>
   $top?: number
   $skip?: number
@@ -131,31 +163,11 @@ export interface ODataQueryOptions<TEntity> {
 }
 
 // Strict type for entity list queries (prevents arbitrary properties)
-export interface EntityListOptions<TEntity> {
+export interface EntityListOptions<TEntity, TMetadata = any> {
   /** Select specific fields (provides IntelliSense) */
   $select?: ODataSelect<TEntity>
   /** Expand related entities */
-  $expand?: ODataExpand
-  /** Filter entities (type-safe field names and operators) */
-  $filter?: ODataFilter<TEntity>
-  /** Sort results by fields with direction */
-  $orderby?: ODataOrderBy<TEntity>
-  /** Limit number of results */
-  $top?: number
-  /** Skip results for pagination */
-  $skip?: number
-  /** Include count in response */
-  $count?: boolean
-  /** Search across fields */
-  $search?: string
-}
-
-// Type-safe entity list options using metadata for expand constraints
-export interface EntityListOptionsWithMetadata<TEntity, TMetadata extends { expandableProperties: readonly string[] }> {
-  /** Select specific fields (provides IntelliSense) */
-  $select?: ODataSelect<TEntity>
-  /** Expand related entities (type-safe to actual lookup fields and relationships) */
-  $expand?: TMetadata['expandableProperties'][number][]
+  $expand?: ODataExpand<TMetadata>
   /** Filter entities (type-safe field names and operators) */
   $filter?: ODataFilter<TEntity>
   /** Sort results by fields with direction */
@@ -201,23 +213,23 @@ export interface EntityMetadata {
 }
 
 // URL builder options
-export interface UrlBuilderOptions<TEntity> extends ODataQueryOptions<TEntity> {
+export interface UrlBuilderOptions<TEntity, TMetadata = any> extends ODataQueryOptions<TEntity, TMetadata> {
   baseUrl?: string
   apiVersion?: string
 }
 
 // Query key factory for React Query
-export interface QueryKeyOptions<TEntity> {
+export interface QueryKeyOptions<TEntity, TMetadata = any> {
   entity: string
   operation: 'single' | 'list' | 'count' | 'related'
   id?: string
   filters?: ODataFilter<TEntity>
-  options?: Omit<ODataQueryOptions<TEntity>, '$filter'>
+  options?: Omit<ODataQueryOptions<TEntity, TMetadata>, '$filter'>
   relationship?: string
 }
 
 // React Query hook options
-export interface UseEntityOptions<TEntity> extends Omit<ODataQueryOptions<TEntity>, '$filter'> {
+export interface UseEntityOptions<TEntity, TMetadata = any> extends Omit<ODataQueryOptions<TEntity, TMetadata>, '$filter'> {
   enabled?: boolean
   staleTime?: number
   cacheTime?: number
@@ -225,7 +237,7 @@ export interface UseEntityOptions<TEntity> extends Omit<ODataQueryOptions<TEntit
   refetchOnMount?: boolean
 }
 
-export interface UseEntityListOptions<TEntity> extends ODataQueryOptions<TEntity> {
+export interface UseEntityListOptions<TEntity, TMetadata = any> extends ODataQueryOptions<TEntity, TMetadata> {
   enabled?: boolean
   staleTime?: number
   cacheTime?: number

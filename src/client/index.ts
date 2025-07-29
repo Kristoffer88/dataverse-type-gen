@@ -232,6 +232,68 @@ export async function fetchEntityMetadata(
 }
 
 /**
+ * Fetch multiple entities metadata including related entities for type-safe expands
+ */
+export async function fetchMultipleEntitiesWithRelated(
+  entityNames: string[],
+  options: FetchEntityMetadataOptions & { includeRelatedEntities?: boolean } = {}
+): Promise<{
+  primaryEntities: EntityDefinition[]
+  relatedEntities: Map<string, EntityDefinition>
+}> {
+  const { includeRelatedEntities = false, ...baseOptions } = options
+  
+  console.log(`📥 Fetching metadata for ${entityNames.length} primary entities...`)
+  
+  // Fetch primary entities with relationships if needed
+  const primaryEntities = await fetchMultipleEntities(entityNames, {
+    ...baseOptions,
+    includeRelationships: includeRelatedEntities
+  })
+
+  const relatedEntities = new Map<string, EntityDefinition>()
+
+  if (includeRelatedEntities && primaryEntities.length > 0) {
+    // Import processor function to extract related entity names
+    const { processEntityMetadata, extractRelatedEntityNames } = await import('../processors/index.js')
+    
+    // Process primary entities to extract related entity names
+    const allRelatedEntityNames = new Set<string>()
+    
+    for (const entity of primaryEntities) {
+      const processed = processEntityMetadata(entity)
+      const relatedNames = extractRelatedEntityNames(processed)
+      relatedNames.forEach(name => allRelatedEntityNames.add(name))
+    }
+
+    // Remove primary entities from related entities list to avoid duplicates
+    entityNames.forEach(name => allRelatedEntityNames.delete(name))
+
+    const relatedEntityArray = Array.from(allRelatedEntityNames)
+
+    if (relatedEntityArray.length > 0) {
+      console.log(`🔗 Discovering ${relatedEntityArray.length} related entities...`)
+      console.log(`📥 Fetching metadata for related entities...`)
+      
+      // Fetch related entities metadata
+      const relatedEntitiesArray = await fetchMultipleEntities(relatedEntityArray, baseOptions)
+      
+      // Store in map for easy lookup
+      for (const entity of relatedEntitiesArray) {
+        relatedEntities.set(entity.LogicalName, entity)
+      }
+      
+      console.log(`✅ Successfully fetched ${relatedEntitiesArray.length} related entities`)
+    }
+  }
+
+  return {
+    primaryEntities,
+    relatedEntities
+  }
+}
+
+/**
  * Fetch entity attributes with proper casting for specific attribute types
  * This is essential for getting full picklist option data
  * 

@@ -25,6 +25,11 @@ export interface DataverseTypeGenConfig {
   /** Solution name (unique name or friendly name) to filter entities by actual solution membership */
   solution?: string
   
+  /** Generate metadata for related entities to enable type-safe nested expands */
+  generateRelatedEntities?: boolean
+  
+  /** Maximum depth for related entity generation (prevents infinite recursion) */
+  maxRelatedEntityDepth?: number
   
   /** Authentication configuration */
   auth?: {
@@ -53,6 +58,8 @@ export interface DataverseTypeGenConfig {
 export const DEFAULT_CONFIG: DataverseTypeGenConfig = {
   outputDir: './generated',
   fileExtension: '.ts',
+  generateRelatedEntities: true, // Enable type-safe nested expands by default
+  maxRelatedEntityDepth: 2, // Prevent infinite recursion while allowing reasonable nesting
   typeGeneration: {
     includeComments: true,
     includeValidation: true,

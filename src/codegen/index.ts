@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs'
 import { join, dirname, relative } from 'path'
+import { fileURLToPath } from 'url'
 import { Project, ScriptTarget, ModuleKind } from 'ts-morph'
 import type { GeneratedCode, TypeGenerationOptions } from '../generators/index.js'
 import { generateEntityFile, generateImports, generateGlobalOptionSetFile } from '../generators/index.js'
@@ -316,21 +317,27 @@ export async function writeEntityTypeDeclaration(
 }
 
 /**
- * Generate TypeScript declarations for multiple entities
+ * Generate TypeScript declarations for multiple entities with optional related entities
  */
 export async function generateMultipleEntityTypes(
   entities: ProcessedEntityMetadata[],
-  config: Partial<CodeGenConfig> = {}
+  config: Partial<CodeGenConfig> = {},
+  relatedEntities: ProcessedEntityMetadata[] = []
 ): Promise<CodeGenResult> {
   const finalConfig = { ...DEFAULT_CONFIG, ...config }
   const startTime = Date.now()
   
   const results: GeneratedFileResult[] = []
   
+  // Combine primary and related entities for processing
+  const allEntities = [...entities, ...relatedEntities]
+  
+  console.log(`📝 Generating ${entities.length} primary entity files${relatedEntities.length > 0 ? ` + ${relatedEntities.length} related entity files` : ''}...`)
+  
   // Collect all unique global option sets from all entities
   const globalOptionSetsMap = new Map<string, ProcessedOptionSet>()
   
-  for (const entity of entities) {
+  for (const entity of allEntities) {
     for (const optionSet of entity.optionSets) {
       if (optionSet.isGlobal && !globalOptionSetsMap.has(optionSet.name)) {
         globalOptionSetsMap.set(optionSet.name, optionSet)
@@ -351,33 +358,64 @@ export async function generateMultipleEntityTypes(
     results.push(...globalOptionSetResults)
   }
   
+  // Collect all related entities from primary entities that need hooks
+  const entitiesNeedingHooks = new Set<ProcessedEntityMetadata>()
+  
+  if (finalConfig.generateHooks) {
+    // Add primary entities
+    entities.forEach(entity => entitiesNeedingHooks.add(entity))
+    
+    // Add all related entities referenced in hooks
+    entities.forEach(entity => {
+      Object.values(entity.relatedEntities).forEach(relatedInfo => {
+        // Find the related entity metadata in allEntities
+        const relatedEntity = allEntities.find(e => e.logicalName === relatedInfo.targetEntityLogicalName)
+        if (relatedEntity) {
+          entitiesNeedingHooks.add(relatedEntity)
+        }
+      })
+    })
+    
+    const hooksCount = entitiesNeedingHooks.size
+    const primaryHooksCount = entities.length
+    const relatedHooksCount = hooksCount - primaryHooksCount
+    console.log(`🔗 Generating ${primaryHooksCount} primary hooks${relatedHooksCount > 0 ? ` + ${relatedHooksCount} related entity hooks` : ''}...`)
+  }
+  
   // Process entities in batches to avoid overwhelming the system
   const batchSize = 5
-  for (let i = 0; i < entities.length; i += batchSize) {
-    const batch = entities.slice(i, i + batchSize)
+  for (let i = 0; i < allEntities.length; i += batchSize) {
+    const batch = allEntities.slice(i, i + batchSize)
     
     // Generate type declarations
     const typePromises = batch.map(entity => 
       writeEntityTypeDeclaration(entity, finalConfig)
     )
     
-    // Generate hooks if enabled
+    // Generate hooks for entities that need them (primary + related entities referenced in hooks)
+    const entitiesNeedingHooksInBatch = batch.filter(entity => entitiesNeedingHooks.has(entity))
     const hookPromises = finalConfig.generateHooks 
-      ? batch.map(entity => writeEntityHooksFile(entity, finalConfig))
+      ? entitiesNeedingHooksInBatch.map(entity => writeEntityHooksFile(entity, finalConfig))
       : []
     
-    // Generate query builders if hooks are enabled
+    // Generate query builders for entities that have hooks
     const queryBuilderPromises = finalConfig.generateHooks 
-      ? batch.map(entity => writeEntityQueryBuildersFile(entity, finalConfig))
+      ? entitiesNeedingHooksInBatch.map(entity => writeEntityQueryBuildersFile(entity, finalConfig))
       : []
     
     const batchResults = await Promise.all([...typePromises, ...hookPromises, ...queryBuilderPromises])
     results.push(...batchResults)
     
     // Small delay between batches to be respectful to the system
-    if (i + batchSize < entities.length) {
+    if (i + batchSize < allEntities.length) {
       await new Promise(resolve => setTimeout(resolve, 50))
     }
+  }
+
+  // Generate query-types file if hooks are enabled
+  if (finalConfig.generateHooks) {
+    const queryTypesResult = await writeQueryTypesFile(finalConfig)
+    results.push(queryTypesResult)
   }
 
   // Generate index file if requested
@@ -424,7 +462,7 @@ async function generateIndexFile(
     for (const file of successfulFiles) {
       // Get relative path from output directory
       const relativePath = relative(config.outputDir, file.filePath)
-      const exportPath = relativePath.replace(/\.(ts|d\.ts)$/, '.js')
+      const exportPath = relativePath.replace(/\.(ts|d\.ts)$/, '')
       lines.push(`export * from './${exportPath}'`)
     }
 
@@ -787,4 +825,134 @@ export async function createOutputDirectory(
   }
 
   return { created, errors }
+}
+
+/**
+ * Generate and write query-types file
+ */
+async function writeQueryTypesFile(config: CodeGenConfig): Promise<GeneratedFileResult> {
+  const fileName = `query-types${config.fileExtension}`
+  const filePath = join(config.outputDir, fileName)
+  
+  try {
+    // Read the source query-types file and generate output
+    const queryTypesContent = await generateQueryTypesFile(config)
+    
+    await fs.mkdir(dirname(filePath), { recursive: true })
+    await fs.writeFile(filePath, queryTypesContent, 'utf8')
+    
+    const stats = await fs.stat(filePath)
+    
+    return {
+      filePath,
+      content: queryTypesContent,
+      size: stats.size,
+      success: true
+    }
+    
+  } catch (error) {
+    return {
+      filePath,
+      content: '',
+      size: 0,
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
+    }
+  }
+}
+
+/**
+ * Generate query-types file content
+ */
+async function generateQueryTypesFile(config: CodeGenConfig): Promise<string> {
+  const { includeComments = true } = config.typeGenerationOptions
+  
+  // Read the source query types file
+  const currentFile = fileURLToPath(import.meta.url)
+  const currentDir = dirname(currentFile)
+  const sourceQueryTypesPath = join(currentDir, '..', 'query', 'types.ts')
+  let sourceContent: string
+  
+  try {
+    sourceContent = await fs.readFile(sourceQueryTypesPath, 'utf8')
+  } catch {
+    // Fallback content if source file is not available
+    sourceContent = generateFallbackQueryTypes()
+  }
+  
+  const lines: string[] = []
+  
+  if (includeComments) {
+    lines.push('/**')
+    lines.push(' * Query Types for Dataverse OData Operations')
+    lines.push(' * ')
+    lines.push(' * Auto-generated type definitions for type-safe Dataverse queries.')
+    lines.push(' * Provides full TypeScript support for filtering, selecting, expanding, and ordering.')
+    lines.push(' * ')
+    lines.push(` * @generated ${new Date().toISOString()}`)
+    lines.push(' */')
+    lines.push('')
+  }
+  
+  // Process the source content to make it suitable for the generated output
+  const processedContent = sourceContent
+    .replace(/^import .*$/gm, '') // Remove import statements
+    .replace(/^export \{ .* \}.*$/gm, '') // Remove export statements
+    .replace(/\/\*\*[\s\S]*?\*\//g, '') // Remove existing JSDoc comments if not including comments
+    .replace(/^\s*\n/gm, '') // Remove empty lines
+    .trim()
+  
+  lines.push(processedContent)
+  
+  return lines.join('\n')
+}
+
+/**
+ * Generate fallback query types if source file is not available
+ */
+function generateFallbackQueryTypes(): string {
+  return `// Basic OData query types for Dataverse operations
+
+export type ODataFilter<TEntity> = {
+  [K in keyof TEntity]?: any
+} & {
+  $and?: ODataFilter<TEntity>[]
+  $or?: ODataFilter<TEntity>[]
+  $not?: ODataFilter<TEntity>
+}
+
+export type ODataSelect<TEntity> = (keyof TEntity)[]
+
+export type ODataExpand<TMetadata = any> = string[] | Record<string, any>
+
+export type ODataOrderBy<TEntity> = {
+  [K in keyof TEntity]?: 'asc' | 'desc'
+} | string[]
+
+export interface EntityListOptions<TEntity, TMetadata = any> {
+  $select?: ODataSelect<TEntity>
+  $expand?: ODataExpand<TMetadata>
+  $filter?: ODataFilter<TEntity>
+  $orderby?: ODataOrderBy<TEntity>
+  $top?: number
+  $skip?: number
+  $count?: boolean
+  $search?: string
+}
+
+export interface EntityOptions<TEntity, TMetadata = any> {
+  $select?: ODataSelect<TEntity>
+  $expand?: ODataExpand<TMetadata>
+}
+
+export interface ODataResponse<T> {
+  '@odata.context': string
+  '@odata.count'?: number
+  '@odata.nextLink'?: string
+  value: T[]
+}
+
+export interface ODataSingleResponse<T> extends Omit<ODataResponse<T>, 'value'> {
+  value?: T
+}`
 }

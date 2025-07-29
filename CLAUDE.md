@@ -18,6 +18,43 @@ The generator transforms EntityMetadata, AttributeMetadata, and OptionSetMetadat
 - **MSAL Authentication**: Uses `@azure/msal-node` with provided `getAzureAccessToken(resourceUrl)` function
 - **CLI-First Approach**: Command-line interface for generating types with configuration-driven workflows
 
+## Running the Type Generator
+
+**Environment Setup:**
+```bash
+export DATAVERSE_INSTANCE=https://krapowerppm.crm4.dynamics.com
+```
+
+**Generate Types Command:**
+```bash
+# Generate types using configuration file
+node dist/bin/cli.cjs generate --config dataverse.config.json
+
+# Alternative: Generate specific entities
+node dist/bin/cli.cjs generate --entities pum_initiative,pum_program,pum_portfolio --generate-related-entities
+
+# Alternative: Generate by publisher prefix
+node dist/bin/cli.cjs generate --publisher pum --generate-related-entities
+```
+
+**Configuration File:**
+Uses `dataverse.config.json` for project-specific settings:
+- Entity selection and publisher filtering
+- Output directory and file extensions
+- Related entity generation depth
+- Hook generation and validation options
+
+**When to Regenerate:**
+- After Dataverse schema changes (new entities, attributes, relationships)
+- When updating entity selections in config
+- Before working on new features requiring type safety
+- After modifying generator code (requires `pnpm build` first)
+
+**Build Requirements:**
+- Run `pnpm build` if modifying generator source code
+- The `dist/bin/cli.cjs` binary is pre-built and ready to use
+- Generated types appear in `./generated/` directory
+
 ## Implementation Guidelines
 
 ### Authentication & API Access

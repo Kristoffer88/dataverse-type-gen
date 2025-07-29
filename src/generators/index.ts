@@ -521,12 +521,24 @@ function generateBindingTypes(
   // Add Create and Update utility types with bindings
   lines.push('')
   lines.push(`export type ${pascalTypeName}Create = Partial<${entityMetadata.schemaName}> & Partial<${pascalTypeName}Bindings> & {`)
-  lines.push(`  ${entityMetadata.primaryNameAttribute}: string; // Required for create`)
+  
+  // Only add primary name attribute if it exists and is not empty
+  const primaryNameAttr = entityMetadata.primaryNameAttribute?.trim()
+  if (primaryNameAttr) {
+    lines.push(`  ${primaryNameAttr}: string; // Required for create`)
+  }
+  
   lines.push(`};`)
   
   lines.push('')
   lines.push(`export type ${pascalTypeName}Update = Partial<Omit<${entityMetadata.schemaName}, '${entityMetadata.primaryIdAttribute}'>> & Partial<${pascalTypeName}Bindings> & {`)
-  lines.push(`  ${entityMetadata.primaryIdAttribute}: string; // Required for update`)
+  
+  // Primary ID attribute should always exist, but add safety check
+  const primaryIdAttr = entityMetadata.primaryIdAttribute?.trim()
+  if (primaryIdAttr) {
+    lines.push(`  ${primaryIdAttr}: string; // Required for update`)
+  }
+  
   lines.push(`};`)
   
   return lines.join('\n')
@@ -591,13 +603,24 @@ function sanitizePropertyName(name: string): string {
 
 function sanitizeOptionName(label: string): string {
   // Convert label to PascalCase identifier
-  return label
+  let sanitized = label
     .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
     .replace(/\s+/g, ' ') // Normalize spaces
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join('')
     .replace(/^[0-9]/, '_$&') // Handle leading numbers
+  
+  // If the sanitized name is empty (e.g., emoji-only labels), generate a fallback
+  if (!sanitized || sanitized.trim() === '') {
+    // Create a fallback name using the original label's character codes
+    const fallback = 'Option' + Array.from(label)
+      .map(char => char.charCodeAt(0))
+      .join('')
+    return fallback
+  }
+  
+  return sanitized
 }
 
 function generateOptionSetConstantName(optionSetName: string): string {

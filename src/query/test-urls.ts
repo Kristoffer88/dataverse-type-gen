@@ -4,7 +4,7 @@
  */
 
 import { DataverseUrls, configureDataverseUrls } from './standalone.js'
-import { createEntityHooks, configureFetch } from './hooks.js'
+import { createEntityHooks } from './hooks.js'
 import { createAuthenticatedFetcher } from '../auth/index.js'
 
 // Import the generated types and metadata
@@ -20,9 +20,8 @@ configureDataverseUrls({
   apiVersion: 'v9.1'
 })
 
-// Configure authenticated fetch for hooks
+// Create authenticated fetch for API calls
 const authenticatedFetch = createAuthenticatedFetcher()
-configureFetch(authenticatedFetch as (input: string | URL | Request, init?: RequestInit) => Promise<Response>)
 
 /**
  * Test the URL builders with the actual Initiative entity

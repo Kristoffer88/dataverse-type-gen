@@ -6,7 +6,6 @@
 // Export hooks functionality
 export {
   createEntityHooks,
-  configureFetch,
   createQueryClient,
   invalidateEntityQueries,
   createPrefetchFunction,

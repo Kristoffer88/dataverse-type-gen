@@ -6,6 +6,8 @@
   "includeValidation": true,
   "entities": ["pum_initiative", "pum_program", "pum_portfolio"],
   "publisher": "pum",
+  "generateRelatedEntities": true,
+  "maxRelatedEntityDepth": 2,
   "typeGeneration": {
     "useExactTypes": true,
     "generateHooks": true,

@@ -50,16 +50,9 @@ export interface UseQueryOptions<TData = unknown, TError = unknown> {
   [key: string]: unknown
 }
 
-// Global configuration for fetch function
-let globalFetch: (url: string, options?: RequestInit) => Promise<Response> = fetch
-
 /**
- * Configure the fetch function used by hooks
- * This should be set to an authenticated fetch function
+ * Uses standard fetch - authentication handled by dataverse-utilities or model-driven apps
  */
-export function configureFetch(fetchFn: (input: string | URL | Request, init?: RequestInit) => Promise<Response>): void {
-  globalFetch = fetchFn as typeof fetch
-}
 
 /**
  * Default error handler for Dataverse API responses
@@ -121,7 +114,7 @@ export function createEntityHooks<
         if (!id) throw new Error('Entity ID is required')
         
         const url = buildEntityUrl<TEntity>(metadata, id, options)
-        const response = await globalFetch(url)
+        const response = await fetch(url)
         return handleResponse<TEntity>(response)
       },
       enabled: enabled && !!id,
@@ -157,7 +150,7 @@ export function createEntityHooks<
           $filter: filters,
           ...options 
         })
-        const response = await globalFetch(url)
+        const response = await fetch(url)
         return handleResponse<ODataResponse<TEntity>>(response)
       },
       enabled,
@@ -180,7 +173,7 @@ export function createEntityHooks<
       queryKey: createQueryKey<TEntity>(metadata.logicalName, 'count', { filters }),
       queryFn: async (): Promise<number> => {
         const url = buildCountUrl<TEntity>(metadata, { $filter: filters })
-        const response = await globalFetch(url)
+        const response = await fetch(url)
         const count = await response.text()
         return parseInt(count, 10)
       },
@@ -221,7 +214,7 @@ export function createEntityHooks<
           $filter: filters,
           ...options 
         })
-        const response = await globalFetch(url)
+        const response = await fetch(url)
         return handleResponse<ODataResponse<TRelated>>(response)
       },
       enabled: enabled && !!id,
@@ -376,7 +369,7 @@ export function createPrefetchFunction<TEntity>(
         queryKey: createQueryKey<TEntity>(metadata.logicalName, 'single', { id }),
         queryFn: async () => {
           const url = buildEntityUrl<TEntity>(metadata, id, options)
-          const response = await globalFetch(url)
+          const response = await fetch(url)
           return handleResponse<TEntity>(response)
         }
       })
@@ -387,7 +380,7 @@ export function createPrefetchFunction<TEntity>(
         queryKey: createQueryKey<TEntity>(metadata.logicalName, 'list', { filters }),
         queryFn: async () => {
           const url = buildEntitySetUrl<TEntity>(metadata, { $filter: filters, ...options })
-          const response = await globalFetch(url)
+          const response = await fetch(url)
           return handleResponse<ODataResponse<TEntity>>(response)
         }
       })

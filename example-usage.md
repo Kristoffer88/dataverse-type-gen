@@ -40,11 +40,7 @@ This generates:
 // App.tsx
 import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { configureFetch, createAuthenticatedFetcher } from 'dataverse-type-gen'
-
-// Configure authentication
-const authenticatedFetch = createAuthenticatedFetcher()
-configureFetch(authenticatedFetch)
+// Authentication is handled automatically by dataverse-utilities or model-driven apps
 
 // Create query client
 const queryClient = new QueryClient()
