@@ -1,0 +1,16 @@
+{
+  "outputDir": "./generated",
+  "fileExtension": ".ts",
+  "includeComments": true,
+  "includeMetadata": true,
+  "includeValidation": true,
+  "entities": ["account"],
+  "cache": {
+    "enabled": true,
+    "ttlHours": 24,
+    "maxSizeMB": 500
+  },
+  "typeGenerationOptions": {
+    "useExactTypes": true
+  }
+}

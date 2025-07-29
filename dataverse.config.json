@@ -1,20 +1,26 @@
 {
-  "outputDir": "./pcf-demo/generated",
+  "dataverseUrl": "https://krapowerppm.crm4.dynamics.com",
+  "outputDir": "pcf-demo/generated",
   "fileExtension": ".ts",
   "includeComments": true,
   "includeMetadata": true,
   "includeValidation": true,
-  "entities": ["pum_initiative", "pum_gantttask"],
+  "entities": ["pum_gantttask", "pum_initiative"],
   "publisher": "pum",
   "generateRelatedEntities": true,
-  "maxRelatedEntityDepth": 1,
   "nestedExpand": false,
+  "maxRelatedEntityDepth": 2,  
+  "relatedEntitiesDir": "related",
   "typeGeneration": {
     "useExactTypes": true,
     "generateHooks": true,
     "includeComments": true,
     "includeMetadata": true,
-    "includeValidation": true,
-    "excludeAuxiliaryAttributes": true
-  }
+    "includeValidation": true
+  },
+  "cache": {
+      "enabled": true,
+      "ttlHours": 24,
+      "maxSizeMB": 500
+    }
 }

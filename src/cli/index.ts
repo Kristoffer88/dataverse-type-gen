@@ -22,6 +22,7 @@ import {
   toCodeGenConfig,
   type DataverseTypeGenConfig 
 } from '../config/index.js'
+import { clearCache, getCacheStatus, cleanupExpiredCache } from '../cache/index.js'
 
 /**
  * CLI configuration interface
@@ -362,8 +363,9 @@ async function generateCommand(options: Record<string, unknown>): Promise<void> 
     // Only include CLI options that were explicitly provided (not undefined)
     const explicitCliOptions: Partial<CLIConfig> = {}
     Object.keys(options).forEach(key => {
-      if (options[key] !== undefined) {
-        explicitCliOptions[key as keyof CLIConfig] = options[key] as any
+      const value = options[key]
+      if (value !== undefined) {
+        (explicitCliOptions as Record<string, unknown>)[key] = value
       }
     })
     
@@ -750,6 +752,11 @@ async function initCommand(options: Record<string, unknown>): Promise<void> {
       ],
       "publisher": "// Your publisher prefix (e.g., 'pum') - for filtering by naming convention",
       "solution": "// Your solution name (e.g., 'MySolution') - for filtering by actual solution membership",
+      "cache": {
+        "enabled": false,
+        "ttlHours": 2,
+        "maxSizeMB": 100
+      },
       "typeGenerationOptions": {
         "useExactTypes": true
       }
@@ -859,6 +866,118 @@ async function validateCommand(options: Record<string, unknown>): Promise<void> 
 }
 
 /**
+ * Cache status command implementation
+ */
+async function cacheStatusCommand(options: Record<string, unknown>): Promise<void> {
+  const loggerOptions = {
+    verbose: Boolean(options.verbose),
+    debug: Boolean(options.debug),
+    outputFormat: (options.outputFormat as 'text' | 'json') || 'text'
+  }
+  const logger = new SimpleLogger(loggerOptions)
+  
+  try {
+    logger.info('📊 Cache Status')
+    
+    const status = await getCacheStatus()
+    
+    if (loggerOptions.outputFormat === 'json') {
+      const output = logger.getJsonOutput()
+      output.push({ level: 'cache_status', ...status, timestamp: new Date().toISOString() })
+    } else {
+      logger.info(`   │`)
+      logger.info(`   ├─ Enabled: ${status.enabled ? '✅ Yes' : '❌ No'}`)
+      logger.info(`   ├─ Cache directory: ${status.cacheDir}`)
+      logger.info(`   ├─ Files: ${status.fileCount}`)
+      logger.info(`   ├─ Total size: ${Math.round(status.totalSize / 1024)}KB`)
+      
+      if (status.oldestFile) {
+        logger.info(`   ├─ Oldest file: ${status.oldestFile.name} (${status.oldestFile.age})`)
+      }
+      
+      if (status.newestFile) {
+        logger.info(`   └─ Newest file: ${status.newestFile.name} (${status.newestFile.age})`)
+      } else {
+        logger.info(`   └─ No files found`)
+      }
+    }
+    
+    if (!status.enabled) {
+      logger.info('')
+      logger.info('💡 To enable caching, set: export DATAVERSE_CACHE_ENABLED=true')
+    }
+    
+  } catch (error) {
+    logger.error(`Failed to get cache status: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  } finally {
+    if (loggerOptions.outputFormat === 'json') {
+      logger.outputJson()
+    }
+  }
+}
+
+/**
+ * Cache clear command implementation
+ */
+async function cacheClearCommand(options: Record<string, unknown>): Promise<void> {
+  const loggerOptions = {
+    verbose: Boolean(options.verbose),
+    debug: Boolean(options.debug),
+    outputFormat: (options.outputFormat as 'text' | 'json') || 'text'
+  }
+  const logger = new SimpleLogger(loggerOptions)
+  
+  try {
+    logger.info('🗑️  Clearing cache...')
+    
+    await clearCache()
+    
+    logger.success('Cache cleared successfully')
+    
+  } catch (error) {
+    logger.error(`Failed to clear cache: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  } finally {
+    if (loggerOptions.outputFormat === 'json') {
+      logger.outputJson()
+    }
+  }
+}
+
+/**
+ * Cache cleanup command implementation
+ */
+async function cacheCleanupCommand(options: Record<string, unknown>): Promise<void> {
+  const loggerOptions = {
+    verbose: Boolean(options.verbose),
+    debug: Boolean(options.debug),
+    outputFormat: (options.outputFormat as 'text' | 'json') || 'text'
+  }
+  const logger = new SimpleLogger(loggerOptions)
+  
+  try {
+    logger.info('🧹 Cleaning up expired cache files...')
+    
+    const removedCount = await cleanupExpiredCache()
+    
+    if (removedCount > 0) {
+      logger.success(`Removed ${removedCount} expired cache files`)
+    } else {
+      logger.info('No expired cache files found')
+    }
+    
+  } catch (error) {
+    logger.error(`Failed to cleanup cache: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  } finally {
+    if (loggerOptions.outputFormat === 'json') {
+      logger.outputJson()
+    }
+  }
+}
+
+/**
  * Main CLI setup
  */
 export function setupCLI(): Command {
@@ -935,6 +1054,45 @@ Examples:
   $ dataverse-type-gen validate --verbose`)
     .action(validateCommand)
   
+  // Cache command group
+  const cacheCommand = program
+    .command('cache')
+    .description('Manage API response cache for faster testing')
+  
+  cacheCommand
+    .command('status')
+    .description('Show cache status and statistics')
+    .option('-v, --verbose', 'Verbose output')
+    .option('--debug', 'Enable debug mode')
+    .option('--output-format <format>', 'Output format: text or json', 'text')
+    .addHelpText('after', `
+Examples:
+  $ dataverse-type-gen cache status
+  $ dataverse-type-gen cache status --verbose`)
+    .action(cacheStatusCommand)
+  
+  cacheCommand
+    .command('clear')
+    .description('Clear all cached API responses')
+    .option('-v, --verbose', 'Verbose output')
+    .option('--debug', 'Enable debug mode')
+    .option('--output-format <format>', 'Output format: text or json', 'text')
+    .addHelpText('after', `
+Examples:
+  $ dataverse-type-gen cache clear`)
+    .action(cacheClearCommand)
+  
+  cacheCommand
+    .command('cleanup')
+    .description('Remove expired cache files')
+    .option('-v, --verbose', 'Verbose output')
+    .option('--debug', 'Enable debug mode')
+    .option('--output-format <format>', 'Output format: text or json', 'text')
+    .addHelpText('after', `
+Examples:
+  $ dataverse-type-gen cache cleanup`)
+    .action(cacheCleanupCommand)
+  
   // Info command
   program
     .command('info')
@@ -944,6 +1102,7 @@ Examples:
       console.log('')
       console.log('🔗 Environment Variables:')
       console.log(`   DATAVERSE_INSTANCE: ${process.env.DATAVERSE_INSTANCE || 'Not set'}`)
+      console.log(`   DATAVERSE_CACHE_ENABLED: ${process.env.DATAVERSE_CACHE_ENABLED || 'Not set (cache disabled)'}`)
       console.log('')
       console.log('📁 Current Directory:', process.cwd())
       console.log('📦 Node Version:', process.version)
@@ -952,6 +1111,7 @@ Examples:
       console.log('   - Run: dataverse-type-gen --help')
       console.log('   - Run: dataverse-type-gen init')
       console.log('   - Run: dataverse-type-gen validate')
+      console.log('   - Run: dataverse-type-gen cache status')
     })
   
   return program
@@ -960,4 +1120,4 @@ Examples:
 // CLI setup is now handled by src/bin/cli.ts
 // This file only exports the CLI functions for testing and reuse
 
-export { generateCommand, initCommand, validateCommand, SimpleLogger }
+export { generateCommand, initCommand, validateCommand, cacheStatusCommand, cacheClearCommand, cacheCleanupCommand, SimpleLogger }

@@ -9,6 +9,7 @@ import { promises as fs } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 import { advancedLog } from '../error-logger.js'
+import { getFromCache, saveToCache } from '../cache/index.js'
 
 // Token caching interface
 interface TokenCache {
@@ -278,6 +279,23 @@ export function createAuthenticatedFetcher(
       }
     }
     
+    // Construct full URL if relative (needed for caching key generation)
+    let fullUrl = url
+    if (!url.startsWith('http')) {
+      const baseUrl = authResourceUrl.endsWith('/') ? authResourceUrl.slice(0, -1) : authResourceUrl
+      fullUrl = `${baseUrl}${url.startsWith('/') ? url : '/' + url}`
+    }
+    
+    // Only attempt cache for GET requests
+    if (process.env.DATAVERSE_CACHE_ENABLED === 'true' && 
+        (!options.method || options.method.toUpperCase() === 'GET')) {
+      
+      const cachedResponse = await getFromCache(fullUrl, options)
+      if (cachedResponse) {
+        return cachedResponse
+      }
+    }
+    
     let lastError: Error | null = null
     let lastResponse: Response | null = null
     
@@ -301,13 +319,6 @@ export function createAuthenticatedFetcher(
         headers.set('Consistency', 'Strong')
         headers.set('Prefer', 'odata.include-annotations="*"')
         
-        // Construct full URL if relative
-        let fullUrl = url
-        if (!url.startsWith('http')) {
-          const baseUrl = authResourceUrl.endsWith('/') ? authResourceUrl.slice(0, -1) : authResourceUrl
-          fullUrl = `${baseUrl}${url.startsWith('/') ? url : '/' + url}`
-        }
-        
         // Make the request
         const response = await fetch(fullUrl, {
           ...options,
@@ -317,6 +328,13 @@ export function createAuthenticatedFetcher(
         // Log error details if response is not OK
         if (!response.ok) {
           await advancedLog(response, fullUrl, options.method || 'GET')
+        }
+        
+        // Cache successful responses only
+        if (process.env.DATAVERSE_CACHE_ENABLED === 'true' && 
+            response.ok && response.status === 200 &&
+            (!options.method || options.method.toUpperCase() === 'GET')) {
+          await saveToCache(fullUrl, options, response.clone())
         }
         
         // Check if we should retry

@@ -507,9 +507,9 @@ export async function fetchMultipleEntities(
   const entities: EntityDefinition[] = []
   const { onProgress } = options
   
-  // Process entities in batches to avoid overwhelming the API
-  // Reduced batch size and increased delays to respect rate limits
-  const batchSize = 3
+  // Process entities in batches - much larger batches when cache is enabled
+  const cacheEnabled = process.env.DATAVERSE_CACHE_ENABLED === 'true'
+  const batchSize = cacheEnabled ? 100 : 3  // 100 when cached, 3 for API calls
   for (let i = 0; i < entityNames.length; i += batchSize) {
     const batch = entityNames.slice(i, i + batchSize)
     
@@ -536,10 +536,10 @@ export async function fetchMultipleEntities(
       onProgress(currentCount, entityNames.length, lastEntityInBatch)
     }
     
-    // Add longer delay between batches to respect API rate limits
-    // With 8000 requests per 300 seconds, we can make ~26 requests per second max
-    // Using batch size 3 with 250ms delay = ~12 requests/second for safety
-    if (i + batchSize < entityNames.length) {
+    // Add delay between batches only when hitting the API (not when using cache)
+    if (!cacheEnabled && i + batchSize < entityNames.length) {
+      // With 8000 requests per 300 seconds, we can make ~26 requests per second max
+      // Using batch size 3 with 250ms delay = ~12 requests/second for safety
       await new Promise(resolve => setTimeout(resolve, 250))
     }
   }
@@ -746,8 +746,9 @@ export async function fetchSolutionEntities(solutionName: string): Promise<Entit
     // Fetch entity metadata for each component
     const entities: EntityDefinition[] = []
     
-    // Process in batches to avoid overwhelming the API
-    const batchSize = 5
+    // Process in batches - larger batches when cache is enabled
+    const cacheEnabled = process.env.DATAVERSE_CACHE_ENABLED === 'true'
+    const batchSize = cacheEnabled ? 100 : 5  // 100 when cached, 5 for API calls
     for (let i = 0; i < entityComponents.length; i += batchSize) {
       const batch = entityComponents.slice(i, i + batchSize)
       
@@ -780,8 +781,8 @@ export async function fetchSolutionEntities(solutionName: string): Promise<Entit
         }
       }
       
-      // Add small delay between batches to be respectful to the API
-      if (i + batchSize < entityComponents.length) {
+      // Add delay between batches only when hitting the API (not when using cache)
+      if (!cacheEnabled && i + batchSize < entityComponents.length) {
         await new Promise(resolve => setTimeout(resolve, 100))
       }
     }
