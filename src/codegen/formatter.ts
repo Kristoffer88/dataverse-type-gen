@@ -1,6 +1,7 @@
 import { Project, ScriptTarget, ModuleKind } from 'ts-morph'
 import { generateImports } from '../generators/index.js'
 import type { GeneratedCode } from '../generators/index.js'
+import type { ProgressSpinner } from './progress-spinner.js'
 
 /**
  * Combine generated code parts into final content
@@ -45,8 +46,8 @@ export function combineGeneratedCode(code: GeneratedCode): string {
   return parts.join('\n').trim() + '\n'
 }
 
-// Track formatting progress globally to avoid excessive logging
-let formattingProgress = { current: 0, total: 0, lastLogTime: 0 }
+// Track formatting progress globally
+let formattingProgress = { current: 0, total: 0, spinner: null as ProgressSpinner | null }
 
 /**
  * Format TypeScript code using ts-morph for proper TypeScript formatting
@@ -54,14 +55,9 @@ let formattingProgress = { current: 0, total: 0, lastLogTime: 0 }
 export async function formatCode(code: string, showProgress: boolean = false): Promise<string> {
   try {
     // Track formatting progress if requested
-    if (showProgress) {
+    if (showProgress && formattingProgress.spinner) {
       formattingProgress.current++
-      const now = Date.now()
-      // Only log progress every 500ms to avoid spam
-      if (now - formattingProgress.lastLogTime > 500) {
-        console.log(`⚡ Formatting files... ${formattingProgress.current}/${formattingProgress.total}`)
-        formattingProgress.lastLogTime = now
-      }
+      formattingProgress.spinner.update(`Formatting files... ${formattingProgress.current}/${formattingProgress.total}`)
     }
 
     // Create a temporary ts-morph project for formatting
@@ -122,8 +118,18 @@ export async function formatCode(code: string, showProgress: boolean = false): P
 /**
  * Initialize formatting progress tracking
  */
-export function initializeFormattingProgress(totalFiles: number): void {
-  formattingProgress = { current: 0, total: totalFiles, lastLogTime: 0 }
+export function initializeFormattingProgress(totalFiles: number, spinner: ProgressSpinner): void {
+  formattingProgress = { current: 0, total: totalFiles, spinner }
+}
+
+/**
+ * Complete formatting progress tracking
+ */
+export function completeFormattingProgress(): void {
+  if (formattingProgress.spinner) {
+    formattingProgress.spinner.stop()
+    formattingProgress.spinner = null
+  }
 }
 
 /**

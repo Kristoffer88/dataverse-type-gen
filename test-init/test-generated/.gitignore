@@ -1,0 +1,8 @@
+# Generated TypeScript files
+*.ts
+*.d.ts
+!*.test.ts
+!*.spec.ts
+
+# Keep directory
+!.gitignore
