@@ -384,7 +384,7 @@ export async function fetchEntityAttributes(
     const basicData = await basicResponse.json() as { value: AttributeMetadata[] }
     const basicAttributes = basicData.value
     
-    // For each attribute type that needs casting, fetch detailed information
+    // For each attribute type that needs casting, fetch detailed information SEQUENTIALLY
     for (const attributeType of attributeTypes) {
       try {
         const castUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes/${attributeType}`
@@ -408,6 +408,10 @@ export async function fetchEntityAttributes(
             }
           }
         }
+        
+        // Add small delay between attribute type fetches to respect API limits
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
         // If casting fails, continue with basic attributes (non-critical)
       } catch (castError) {
         console.warn(`Failed to cast attributes for type ${attributeType} on entity ${entityLogicalName}:`, castError)

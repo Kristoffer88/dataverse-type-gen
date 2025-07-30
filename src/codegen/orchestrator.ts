@@ -94,7 +94,7 @@ export async function generateMultipleEntityTypes(
   }
   
   // Process entities in batches to avoid overwhelming the system
-  const batchSize = 5
+  const batchSize = 3  // Conservative batch size to respect API limits
   const totalBatches = Math.ceil(allEntities.length / batchSize)
   
   for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
@@ -128,9 +128,9 @@ export async function generateMultipleEntityTypes(
       onProgress(completedFiles, totalExpectedFiles, currentEntity)
     }
     
-    // Small delay between batches to be respectful to the system
+    // Longer delay between batches to respect API rate limits
     if (batchIndex < totalBatches - 1) {
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await new Promise(resolve => setTimeout(resolve, 200))  // Increased from 50ms to 200ms
     }
   }
 
