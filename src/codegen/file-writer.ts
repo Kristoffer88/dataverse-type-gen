@@ -20,7 +20,7 @@ export async function writeGlobalOptionSetDeclaration(
     
     // Format the code if prettier is enabled
     const formattedContent = config.prettier 
-      ? await formatCode(content)
+      ? await formatCode(content, true)
       : content
 
     // Determine file path - create in global-choices subdirectory
@@ -83,7 +83,7 @@ export async function writeEntityHooksFile(
     
     // Format the code if prettier is enabled
     const formattedContent = config.prettier 
-      ? await formatCode(content)
+      ? await formatCode(content, true)
       : content
 
     // Determine file path - hooks files go in hooks subdirectory with related entities in hooks/related
@@ -161,7 +161,7 @@ export async function writeEntityQueryBuildersFile(
     
     // Format the code if prettier is enabled
     const formattedContent = config.prettier 
-      ? await formatCode(content)
+      ? await formatCode(content, true)
       : content
 
     // Determine file path - query builders files go in queries subdirectory with related entities in queries/related
@@ -243,7 +243,7 @@ export async function writeEntityTypeDeclaration(
     
     // Format the code if prettier is enabled
     const formattedContent = config.prettier 
-      ? await formatCode(content)
+      ? await formatCode(content, true)
       : content
 
     // Determine file path - primary entities in root, related entities in subdirectory

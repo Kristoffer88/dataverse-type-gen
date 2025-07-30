@@ -8,6 +8,7 @@ import {
   writeQueryTypesFile 
 } from './file-writer.js'
 import { generateIndexFile, calculateGenerationResults } from './result-tracking.js'
+import { initializeFormattingProgress } from './formatter.js'
 
 /**
  * Default code generation configuration
@@ -59,6 +60,14 @@ export async function generateMultipleEntityTypes(
     }
   }
   
+  // Initialize progress tracking for formatting if prettier is enabled
+  if (finalConfig.prettier) {
+    const totalExpectedFiles = allEntities.length + (finalConfig.generateHooks ? entities.length * 2 : 0) + globalOptionSetsMap.size + (finalConfig.generateHooks ? 1 : 0) + (finalConfig.indexFile ? 1 : 0)
+    initializeFormattingProgress(totalExpectedFiles)
+    console.log(`⚡ Code formatting enabled - processing ${totalExpectedFiles} files with TypeScript formatter...`)
+    console.log(`   This may take several seconds due to TypeScript parsing and formatting`)
+  }
+  
   const globalOptionSets = Array.from(globalOptionSetsMap.values())
   
   // Generate global option set files
@@ -84,8 +93,14 @@ export async function generateMultipleEntityTypes(
   
   // Process entities in batches to avoid overwhelming the system
   const batchSize = 5
-  for (let i = 0; i < allEntities.length; i += batchSize) {
+  const totalBatches = Math.ceil(allEntities.length / batchSize)
+  
+  for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+    const i = batchIndex * batchSize
     const batch = allEntities.slice(i, i + batchSize)
+    
+    // Show progress for file generation
+    console.log(`📄 Processing batch ${batchIndex + 1}/${totalBatches} (${batch.length} files)...`)
     
     // Generate type declarations
     const typePromises = batch.map(entity => 
@@ -106,8 +121,13 @@ export async function generateMultipleEntityTypes(
     const batchResults = await Promise.all([...typePromises, ...hookPromises, ...queryBuilderPromises])
     results.push(...batchResults)
     
+    // Report progress after each batch
+    const completedFiles = results.filter(r => r.success).length
+    const totalExpectedFiles = allEntities.length + (finalConfig.generateHooks ? entities.length * 2 : 0) + globalOptionSets.length
+    console.log(`✅ Completed ${completedFiles}/${totalExpectedFiles} files`)
+    
     // Small delay between batches to be respectful to the system
-    if (i + batchSize < allEntities.length) {
+    if (batchIndex < totalBatches - 1) {
       await new Promise(resolve => setTimeout(resolve, 50))
     }
   }

@@ -45,11 +45,25 @@ export function combineGeneratedCode(code: GeneratedCode): string {
   return parts.join('\n').trim() + '\n'
 }
 
+// Track formatting progress globally to avoid excessive logging
+let formattingProgress = { current: 0, total: 0, lastLogTime: 0 }
+
 /**
  * Format TypeScript code using ts-morph for proper TypeScript formatting
  */
-export async function formatCode(code: string): Promise<string> {
+export async function formatCode(code: string, showProgress: boolean = false): Promise<string> {
   try {
+    // Track formatting progress if requested
+    if (showProgress) {
+      formattingProgress.current++
+      const now = Date.now()
+      // Only log progress every 500ms to avoid spam
+      if (now - formattingProgress.lastLogTime > 500) {
+        console.log(`⚡ Formatting files... ${formattingProgress.current}/${formattingProgress.total}`)
+        formattingProgress.lastLogTime = now
+      }
+    }
+
     // Create a temporary ts-morph project for formatting
     const project = new Project({
       useInMemoryFileSystem: true,
@@ -103,6 +117,13 @@ export async function formatCode(code: string): Promise<string> {
       .replace(/\s+$/gm, '') // Remove trailing whitespace
       .trim() + '\n'
   }
+}
+
+/**
+ * Initialize formatting progress tracking
+ */
+export function initializeFormattingProgress(totalFiles: number): void {
+  formattingProgress = { current: 0, total: totalFiles, lastLogTime: 0 }
 }
 
 /**

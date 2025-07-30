@@ -29,7 +29,7 @@ export async function generateIndexFile(
 
     const content = lines.join('\n') + '\n'
     const formattedContent = config.prettier 
-      ? await formatCode(content)
+      ? await formatCode(content, true)
       : content
 
     const indexPath = join(config.outputDir, `index${config.fileExtension}`)
