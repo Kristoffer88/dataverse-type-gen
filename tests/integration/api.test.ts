@@ -3,9 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { 
   getAzureAccessToken, 
   getAzureToken, 
-  createAuthenticatedFetcher,
-  clearTokenCache,
-  getTokenCacheInfo 
+  createAuthenticatedFetcher
 } from '../../src/auth/index.js'
 import { getEntityDefinitions } from '../../src/metadata-client.js'
 import { advancedLog } from '../../src/error-logger.js'
@@ -17,10 +15,6 @@ describe('Authentication System', () => {
   const skipCondition = !dataverseInstance
   const describeOrSkip = skipCondition ? describe.skip : describe
   
-  beforeEach(async () => {
-    // Clear token cache before each test to ensure fresh authentication
-    await clearTokenCache()
-  })
 
   describeOrSkip('Azure Identity Integration', () => {
     it('should acquire access token using Azure Identity', async () => {
@@ -41,25 +35,6 @@ describe('Authentication System', () => {
       expect(token.length).toBeGreaterThan(0)
     }, 30000)
 
-    it('should cache tokens properly', async () => {
-      // First call
-      const token1 = await getAzureToken({
-        resourceUrl: dataverseInstance!
-      })
-      
-      // Check cache info
-      const cacheInfo = getTokenCacheInfo()
-      expect(cacheInfo).toHaveLength(1)
-      expect(cacheInfo[0].resourceUrl).toBe(dataverseInstance!.endsWith('/') ? dataverseInstance : `${dataverseInstance}/`)
-      expect(cacheInfo[0].isExpired).toBe(false)
-      
-      // Second call should use cached token
-      const token2 = await getAzureToken({
-        resourceUrl: dataverseInstance!
-      })
-      
-      expect(token1).toBe(token2)
-    }, 30000)
   })
 
   describeOrSkip('Authenticated Fetch Wrapper', () => {
@@ -167,36 +142,6 @@ describe('Authentication System', () => {
     }, 30000)
   })
 
-  describeOrSkip('Token Cache Management', () => {
-    it('should clear token cache', async () => {
-      // First, get a token to populate cache
-      await getAzureToken({
-        resourceUrl: dataverseInstance!
-      })
-      
-      let cacheInfo = getTokenCacheInfo()
-      expect(cacheInfo.length).toBeGreaterThan(0)
-      
-      // Clear cache
-      await clearTokenCache()
-      
-      cacheInfo = getTokenCacheInfo()
-      expect(cacheInfo).toHaveLength(0)
-    })
-
-    it('should handle expired tokens by refreshing', async () => {
-      // This test is hard to implement without mocking time
-      // In a real scenario, we'd need to wait for token expiry or mock the expiry time
-      console.log('Token expiry test - would require time mocking for full testing')
-      
-      // At minimum, verify we can get a fresh token
-      const token = await getAzureToken({
-        resourceUrl: dataverseInstance!
-      })
-      
-      expect(token).toBeTruthy()
-    }, 30000)
-  })
 })
 
 // Helper to run authentication tests in isolation

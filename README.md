@@ -377,9 +377,8 @@ This package uses **Azure Identity** for secure authentication with multiple cre
 
 ### Token Caching
 
-Authentication tokens are automatically cached:
-- **In-memory**: For the current session
-- **Disk cache**: `~/.dataverse-type-gen/token-cache.json`
+Authentication tokens are handled by the Azure Identity SDK:
+- **Secure storage**: Azure CLI/SDK manages token caching securely
 - **Automatic refresh**: Handles token expiry transparently
 
 ## License

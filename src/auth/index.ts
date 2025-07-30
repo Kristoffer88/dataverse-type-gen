@@ -5,18 +5,9 @@ import {
   ManagedIdentityCredential,
   TokenCredential 
 } from '@azure/identity'
-import { promises as fs } from 'fs'
-import { join } from 'path'
-import { homedir } from 'os'
 import { advancedLog } from '../error-logger.js'
 import { getFromCache, saveToCache } from '../cache/index.js'
 
-// Token caching interface
-interface TokenCache {
-  accessToken: string
-  expiresAt: number
-  resourceUrl: string
-}
 
 // Azure authentication options
 export interface AzureAuthOptions {
@@ -25,47 +16,8 @@ export interface AzureAuthOptions {
   scopes?: string[]
 }
 
-// Global token cache store (in-memory and file-based)
-const tokenCache = new Map<string, TokenCache>()
-const CACHE_FILE_PATH = join(homedir(), '.dataverse-type-gen', 'token-cache.json')
 
-/**
- * Load cached tokens from disk
- */
-async function loadTokenCacheFromDisk(): Promise<void> {
-  try {
-    await fs.mkdir(join(homedir(), '.dataverse-type-gen'), { recursive: true })
-    const cacheData = await fs.readFile(CACHE_FILE_PATH, 'utf-8')
-    const cachedTokens = JSON.parse(cacheData) as Record<string, TokenCache>
-    
-    // Load valid tokens into memory cache
-    const now = Date.now()
-    Object.entries(cachedTokens).forEach(([key, token]) => {
-      if (token.expiresAt > now) {
-        tokenCache.set(key, token)
-      }
-    })
-  } catch {
-    // Cache file doesn't exist or is invalid - no problem, we'll create it
-  }
-}
 
-/**
- * Save token cache to disk
- */
-async function saveTokenCacheToDisk(): Promise<void> {
-  try {
-    const cacheData: Record<string, TokenCache> = {}
-    tokenCache.forEach((token, key) => {
-      cacheData[key] = token
-    })
-    
-    await fs.mkdir(join(homedir(), '.dataverse-type-gen'), { recursive: true })
-    await fs.writeFile(CACHE_FILE_PATH, JSON.stringify(cacheData, null, 2))
-  } catch (error) {
-    console.warn('Failed to save token cache:', error)
-  }
-}
 
 /**
  * Validate and sanitize resource URL
@@ -100,26 +52,13 @@ function createCredentialChain(): TokenCredential {
 
 /**
  * Get Azure access token for the specified resource using Azure Identity SDK
- * Includes caching to avoid repeated token requests
- * 🔒 SECURITY HARDENED: Input validation, credential chaining, token sanitization
+ * 🔒 SECURITY HARDENED: Input validation, credential chaining, relies on Azure SDK caching
  */
 export async function getAzureToken(options: AzureAuthOptions): Promise<string | null> {
   const { resourceUrl, credential, scopes } = options
   
   // Validate and normalize resource URL
   const normalizedResourceUrl = validateResourceUrl(resourceUrl)
-  const cacheKey = `token_${normalizedResourceUrl}`
-  
-  // Load token cache from disk if not already loaded
-  if (tokenCache.size === 0) {
-    await loadTokenCacheFromDisk()
-  }
-  
-  // Check for cached valid token
-  const cachedToken = tokenCache.get(cacheKey)
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60000) { // 1 minute buffer
-    return cachedToken.accessToken
-  }
   
   try {
     // Use provided credential or create default chain
@@ -128,29 +67,12 @@ export async function getAzureToken(options: AzureAuthOptions): Promise<string |
     // Determine scopes - default to resource URL + .default scope
     const tokenScopes = scopes || [`${normalizedResourceUrl}.default`]
     
-    // Request token
+    // Request token (Azure SDK handles its own secure caching)
     const tokenResponse = await tokenCredential.getToken(tokenScopes)
     
-    if (!tokenResponse?.token) {
-      return null
-    }
-    
-    // Cache the token
-    const expiresAt = tokenResponse.expiresOnTimestamp || (Date.now() + 3600000) // Default 1 hour
-    const tokenData: TokenCache = {
-      accessToken: tokenResponse.token,
-      expiresAt,
-      resourceUrl: normalizedResourceUrl
-    }
-    
-    tokenCache.set(cacheKey, tokenData)
-    await saveTokenCacheToDisk()
-    
-    return tokenResponse.token
+    return tokenResponse?.token || null
     
   } catch {
-    // Clear any invalid cached token
-    tokenCache.delete(cacheKey)
     return null
   }
 }
@@ -301,7 +223,7 @@ export function createAuthenticatedFetcher(
     
     for (let attempt = 1; attempt <= config.maxRetries + 1; attempt++) {
       try {
-        // Get fresh access token for each retry using the new Azure Identity approach
+        // Get fresh access token for each retry using Azure Identity approach
         const accessToken = await getAzureToken({ 
           resourceUrl: authResourceUrl, 
           credential 
@@ -383,26 +305,4 @@ export function createAuthenticatedFetcher(
   }
 }
 
-/**
- * Clear all cached tokens (useful for logout or testing)
- */
-export async function clearTokenCache(): Promise<void> {
-  tokenCache.clear()
-  try {
-    await fs.unlink(CACHE_FILE_PATH)
-  } catch {
-    // Cache file might not exist - that's fine
-  }
-}
 
-/**
- * Get information about cached tokens (for debugging)
- */
-export function getTokenCacheInfo(): Array<{ resourceUrl: string; expiresAt: Date; isExpired: boolean }> {
-  const now = Date.now()
-  return Array.from(tokenCache.values()).map(token => ({
-    resourceUrl: token.resourceUrl,
-    expiresAt: new Date(token.expiresAt),
-    isExpired: token.expiresAt <= now
-  }))
-}

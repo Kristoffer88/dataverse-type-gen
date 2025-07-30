@@ -17,6 +17,9 @@ build/
 .env.test.local
 .env.production.local
 
+# Authentication cache
+token-cache.json
+
 # IDE files
 .vscode/
 .idea/
