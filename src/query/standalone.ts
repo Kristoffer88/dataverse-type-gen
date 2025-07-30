@@ -43,7 +43,7 @@ export const DataverseUrls = {
    * Get URL for a single entity by ID
    * 
    * @example
-   * const url = DataverseUrls.entity(entityMetadata, "123e4567-e89b-12d3-a456-426614174000", {
+   * const url = DataverseUrls.entity(entityMetadata, "<entity-id>", {
    *   $select: ['<primary_name_field>', '<description_field>'],
    *   $expand: ['<related_entity>']
    * })
@@ -120,7 +120,7 @@ export const DataverseUrls = {
    * Get URL for related entities
    * 
    * @example
-   * const url = DataverseUrls.related(entityMetadata, "123e4567-e89b-12d3-a456-426614174000", "<entity_relationship>", {
+   * const url = DataverseUrls.related(entityMetadata, "<entity-id>", "<entity_relationship>", {
    *   $filter: { statecode: '<RelatedEntityStatecode>'.Active.Value },
    *   $select: ['<primary_name_field>', '<date_field>'],
    *   $orderby: { '<date_field>': 'asc' }

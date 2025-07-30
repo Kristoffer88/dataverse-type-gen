@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url'
 import { Project, ScriptTarget, ModuleKind } from 'ts-morph'
 import type { GeneratedCode, TypeGenerationOptions } from '../generators/index.js'
 import { generateEntityFile, generateImports, generateGlobalOptionSetFile } from '../generators/index.js'
-import { generateEntityHooksFile, generateEntityQueryBuildersFile } from '../generators/query-hooks.js'
+import { generateEntityHooks, generateEntityHooksFile, generateEntityQueryBuildersFile } from '../generators/query-hooks.js'
 import type { ProcessedEntityMetadata, ProcessedOptionSet } from '../processors/index.js'
 
 /**
@@ -21,6 +21,7 @@ export interface CodeGenConfig {
   relatedEntitiesDir?: string
   primaryEntities?: string[]
   typeGenerationOptions: TypeGenerationOptions
+  debug?: boolean
 }
 
 /**
@@ -161,8 +162,11 @@ export async function writeEntityHooksFile(
   const finalConfig = { ...DEFAULT_CONFIG, ...config }
 
   try {
-    // Generate the hooks code
-    const content = generateEntityHooksFile(entityMetadata, finalConfig.typeGenerationOptions)
+    // Generate the actual hooks content first
+    const hooksContent = generateEntityHooks(entityMetadata, finalConfig.typeGenerationOptions)
+    
+    // Generate the complete hooks file with header and content
+    const content = generateEntityHooksFile(entityMetadata, finalConfig.typeGenerationOptions, hooksContent)
     
     // Format the code if prettier is enabled
     const formattedContent = finalConfig.prettier 
@@ -176,6 +180,8 @@ export async function writeEntityHooksFile(
     // Check if directory organization should be enabled
     const shouldOrganizeDirectories = finalConfig.relatedEntitiesDir && 
       (finalConfig.typeGenerationOptions.nestedExpand || finalConfig.primaryEntities?.length);
+    
+    // Directory structure logic is working correctly
     
     const hooksDir = !shouldOrganizeDirectories || isPrimaryEntity(entityMetadata.logicalName, finalConfig.primaryEntities) 
       ? hooksBaseDir 
@@ -422,28 +428,15 @@ export async function generateMultipleEntityTypes(
     results.push(...globalOptionSetResults)
   }
   
-  // Collect all related entities from primary entities that need hooks
+  // Only generate hooks for primary entities requested by the user
+  // Related entities get type definitions but not hooks/queries
   const entitiesNeedingHooks = new Set<ProcessedEntityMetadata>()
   
   if (finalConfig.generateHooks) {
-    // Add primary entities
+    // Only add primary entities - no hooks for related entities
     entities.forEach(entity => entitiesNeedingHooks.add(entity))
     
-    // Add all related entities referenced in hooks
-    entities.forEach(entity => {
-      Object.values(entity.relatedEntities).forEach(relatedInfo => {
-        // Find the related entity metadata in allEntities
-        const relatedEntity = allEntities.find(e => e.logicalName === relatedInfo.targetEntityLogicalName)
-        if (relatedEntity) {
-          entitiesNeedingHooks.add(relatedEntity)
-        }
-      })
-    })
-    
-    const hooksCount = entitiesNeedingHooks.size
-    const primaryHooksCount = entities.length
-    const relatedHooksCount = hooksCount - primaryHooksCount
-    console.log(`🔗 Generating ${primaryHooksCount} primary hooks${relatedHooksCount > 0 ? ` + ${relatedHooksCount} related entity hooks` : ''}...`)
+    console.log(`🔗 Generating ${entities.length} hooks for primary entities only...`)
   }
   
   // Process entities in batches to avoid overwhelming the system

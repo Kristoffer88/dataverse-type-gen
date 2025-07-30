@@ -12,7 +12,7 @@ export function generateMetadataObject(
   const { includeComments = true } = options
   const lines: string[] = []
   const schemaName = sanitizeInterfaceName(entityMetadata.schemaName)
-  const metadataName = `${schemaName}Metadata`
+  const metadataName = `${schemaName}Meta`
 
   // Metadata header comment
   if (includeComments) {

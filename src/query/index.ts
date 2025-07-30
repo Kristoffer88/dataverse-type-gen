@@ -3,12 +3,8 @@
  * Provides React Query hooks and URL builders for Dataverse
  */
 
-// Export hooks functionality
+// Export hooks types (functions are not needed - use generated hooks instead)
 export {
-  createEntityHooks,
-  createQueryClient,
-  invalidateEntityQueries,
-  createPrefetchFunction,
   type UseQueryResult,
   type UseQueryOptions
 } from './hooks.js'

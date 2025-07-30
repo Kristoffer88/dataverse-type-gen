@@ -352,7 +352,7 @@ export async function generateEntityTypeScript(
     if (options.includeMetadata !== false) {
       // Add metadata object for runtime information
       tsContent += `// Metadata object for runtime information\n`
-      tsContent += `export const ${entity.SchemaName}Metadata = {\n`
+      tsContent += `export const ${entity.SchemaName}Meta = {\n`
       tsContent += `  entityName: "${entity.LogicalName}",\n`
       tsContent += `  schemaName: "${entity.SchemaName}",\n`
       tsContent += `  displayName: "${entity.DisplayName?.UserLocalizedLabel?.Label || entity.SchemaName}",\n`
