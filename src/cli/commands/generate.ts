@@ -314,7 +314,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       // Override with any CLI options that were provided
       outputDir: config.outputDir,
       fileExtension: config.fileExtension,
-      entities: Array.isArray(config.entities) ? config.entities : (config.entities ? [config.entities] : dataverseConfig.entities),
+      entities: entitiesToProcess.length > 0 ? entitiesToProcess : dataverseConfig.entities,
       publisher: config.publisher,
       solution: config.solution,
       generateRelatedEntities: config.generateRelatedEntities,
