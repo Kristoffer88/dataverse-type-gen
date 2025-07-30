@@ -57,10 +57,13 @@ let formattingProgress = {
  */
 export async function formatCode(code: string, showProgress: boolean = false): Promise<string> {
   try {
-    // Track formatting progress if requested
+    // Track formatting progress if requested - only update every 50 files to avoid spam
     if (showProgress && formattingProgress.onProgress) {
       formattingProgress.current++
-      formattingProgress.onProgress(formattingProgress.current, formattingProgress.total, 'formatting')
+      // Only update progress every 50 files or on the last file
+      if (formattingProgress.current % 50 === 0 || formattingProgress.current === formattingProgress.total) {
+        formattingProgress.onProgress(formattingProgress.current, formattingProgress.total, 'formatting')
+      }
     }
 
     // Create a temporary ts-morph project for formatting
