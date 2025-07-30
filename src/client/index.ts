@@ -410,7 +410,7 @@ export async function fetchEntityAttributes(
         }
         
         // Add small delay between attribute type fetches to respect API limits
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 50))
         
         // If casting fails, continue with basic attributes (non-critical)
       } catch (castError) {
