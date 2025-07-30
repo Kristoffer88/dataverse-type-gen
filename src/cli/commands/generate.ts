@@ -336,7 +336,11 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       !processedEntities.some(primary => primary.logicalName === entity.logicalName)
     )
     
-    const result = await generateMultipleEntityTypes(processedEntities, codeGenConfig, relatedEntities)
+    const result = await generateMultipleEntityTypes(processedEntities, codeGenConfig, relatedEntities, (current, total, item) => {
+      if (!loggerOptions.quiet) {
+        logger.progress(current, total, item)
+      }
+    })
     
     // Report results
     logger.success(`Generated ${result.successfulFiles} TypeScript files`)

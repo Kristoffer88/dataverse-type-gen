@@ -9,7 +9,6 @@ import {
 } from './file-writer.js'
 import { generateIndexFile, calculateGenerationResults } from './result-tracking.js'
 import { initializeFormattingProgress, completeFormattingProgress } from './formatter.js'
-import { ProgressSpinner } from './progress-spinner.js'
 
 /**
  * Default code generation configuration
@@ -38,7 +37,8 @@ export const DEFAULT_CODEGEN_CONFIG: CodeGenConfig = {
 export async function generateMultipleEntityTypes(
   entities: ProcessedEntityMetadata[],
   config: Partial<CodeGenConfig> = {},
-  relatedEntities: ProcessedEntityMetadata[] = []
+  relatedEntities: ProcessedEntityMetadata[] = [],
+  onProgress?: (current: number, total: number, item?: string) => void
 ): Promise<CodeGenResult> {
   const finalConfig = { ...DEFAULT_CODEGEN_CONFIG, ...config }
   const startTime = Date.now()
@@ -63,11 +63,11 @@ export async function generateMultipleEntityTypes(
   
   // Setup progress tracking for generation
   const totalExpectedFiles = allEntities.length + (finalConfig.generateHooks ? entities.length * 2 : 0) + globalOptionSetsMap.size + (finalConfig.generateHooks ? 1 : 0) + (finalConfig.indexFile ? 1 : 0)
-  const spinner = new ProgressSpinner()
+  let completedFiles = 0
   
   // Initialize formatting progress if prettier is enabled
   if (finalConfig.prettier) {
-    initializeFormattingProgress(totalExpectedFiles, spinner)
+    initializeFormattingProgress(totalExpectedFiles, onProgress)
   }
   
   const globalOptionSets = Array.from(globalOptionSetsMap.values())
@@ -91,12 +91,6 @@ export async function generateMultipleEntityTypes(
     entities.forEach(entity => entitiesNeedingHooks.add(entity))
     
     console.log(`🔗 Generating ${entities.length} hooks for primary entities only...`)
-    
-    // Start spinner for file generation
-    spinner.start(`Generating ${totalExpectedFiles} TypeScript files...`)
-  } else {
-    // Start spinner for file generation without hooks
-    spinner.start(`Generating ${totalExpectedFiles} TypeScript files...`)
   }
   
   // Process entities in batches to avoid overwhelming the system
@@ -126,10 +120,12 @@ export async function generateMultipleEntityTypes(
     const batchResults = await Promise.all([...typePromises, ...hookPromises, ...queryBuilderPromises])
     results.push(...batchResults)
     
-    // Update spinner with progress
-    const completedFiles = results.filter(r => r.success).length
-    if (!finalConfig.prettier) {
-      spinner.update(`Generated ${completedFiles}/${totalExpectedFiles} files...`)
+    // Update progress bar with current status
+    completedFiles = results.filter(r => r.success).length
+    if (onProgress && !finalConfig.prettier) {
+      // Show progress for file generation (formatting will have its own progress)
+      const currentEntity = batch[batch.length - 1]?.logicalName || ''
+      onProgress(completedFiles, totalExpectedFiles, currentEntity)
     }
     
     // Small delay between batches to be respectful to the system
@@ -152,10 +148,6 @@ export async function generateMultipleEntityTypes(
     indexFile = await generateIndexFile(entityFiles, finalConfig)
   }
 
-  // Stop spinner and show completion
-  const successfulFiles = results.filter(r => r.success).length
-  spinner.stop(`✅ Generated ${successfulFiles} TypeScript files`)
-  
   // Complete formatting progress if it was enabled
   if (finalConfig.prettier) {
     completeFormattingProgress()
