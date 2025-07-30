@@ -6,7 +6,12 @@ import crypto from 'crypto'
 /**
  * Get cache configuration from environment variables
  */
-function getCacheConfig() {
+function getCacheConfig(): {
+  baseDir: string
+  ttlHours: number
+  maxSizeBytes: number
+  enabled: boolean
+} {
   return {
     baseDir: process.env.DATAVERSE_CACHE_DIR || path.join(os.homedir(), '.dataverse-type-gen', 'safe-cache'),
     ttlHours: process.env.DATAVERSE_CACHE_TTL_HOURS ? parseInt(process.env.DATAVERSE_CACHE_TTL_HOURS, 10) : 2,

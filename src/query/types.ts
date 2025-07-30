@@ -104,18 +104,13 @@ export type ODataSelect<TEntity> = (keyof TEntity)[]
 // Nested expand options for individual expanded entities
 export type ExpandOptions = {
   $select?: string[]
-  $filter?: Record<string, any>
+  $filter?: Record<string, unknown>
   $orderby?: Record<string, 'asc' | 'desc'> | string[]
   $top?: number
 }
 
-// Helper type to extract entity interface from metadata
-type EntityFromMetadata<TMeta> = TMeta extends { attributes: readonly any[] } ? {
-  [K in TMeta['attributes'][number]['logicalName']]: any
-} : any
-
 // Type for individual expand options with target entity awareness
-export type RelationshipExpandOption<TTargetEntity = any> = {
+export type RelationshipExpandOption<TTargetEntity = unknown> = {
   $select?: (keyof TTargetEntity)[]
   $filter?: ODataFilter<TTargetEntity>  
   $orderby?: ODataOrderBy<TTargetEntity>
@@ -130,18 +125,18 @@ export type TypeSafeExpand<TEntityMetadata> = TEntityMetadata extends {
   relatedEntities: infer TRelated
 } ? {
   [K in keyof TRelated]?: TRelated[K] extends { targetEntityLogicalName: string }
-    ? RelationshipExpandOption<any> // Will be properly typed in generated code
+    ? RelationshipExpandOption<unknown> // Will be properly typed in generated code
     : never
 } : ExpandObject // Fallback for when metadata isn't available
 
 // Base expand type - supports both simple arrays and nested object syntax
-export type ODataExpand<TEntityMetadata = any> = 
+export type ODataExpand<TEntityMetadata = unknown> = 
   | string[] // Simple array format: ['rel1', 'rel2'] 
   | TypeSafeExpand<TEntityMetadata> // Type-safe object format
   | ExpandObject // Generic object format fallback
 
 // Helper type to extract expandable properties from entity with metadata
-export type ExpandablePropertiesOf<T> = T extends { relatedEntities: any } 
+export type ExpandablePropertiesOf<T> = T extends { relatedEntities: unknown } 
   ? ODataExpand<T>
   : string[] | Record<string, ExpandOptions>
 
@@ -151,7 +146,7 @@ export type ODataOrderBy<TEntity> = {
 } | string[]
 
 // Complete OData query options
-export interface ODataQueryOptions<TEntity, TMetadata = any> {
+export interface ODataQueryOptions<TEntity, TMetadata = unknown> {
   $filter?: ODataFilter<TEntity>
   $select?: ODataSelect<TEntity>
   $expand?: ODataExpand<TMetadata>
@@ -163,7 +158,7 @@ export interface ODataQueryOptions<TEntity, TMetadata = any> {
 }
 
 // Strict type for entity list queries (prevents arbitrary properties)
-export interface EntityListOptions<TEntity, TMetadata = any> {
+export interface EntityListOptions<TEntity, TMetadata = unknown> {
   /** Select specific fields (provides IntelliSense) */
   $select?: ODataSelect<TEntity>
   /** Expand related entities */
@@ -213,13 +208,13 @@ export interface EntityMetadata {
 }
 
 // URL builder options
-export interface UrlBuilderOptions<TEntity, TMetadata = any> extends ODataQueryOptions<TEntity, TMetadata> {
+export interface UrlBuilderOptions<TEntity, TMetadata = unknown> extends ODataQueryOptions<TEntity, TMetadata> {
   baseUrl?: string
   apiVersion?: string
 }
 
 // Query key factory for React Query
-export interface QueryKeyOptions<TEntity, TMetadata = any> {
+export interface QueryKeyOptions<TEntity, TMetadata = unknown> {
   entity: string
   operation: 'single' | 'list' | 'count' | 'related'
   id?: string
@@ -229,7 +224,7 @@ export interface QueryKeyOptions<TEntity, TMetadata = any> {
 }
 
 // React Query hook options
-export interface UseEntityOptions<TEntity, TMetadata = any> extends Omit<ODataQueryOptions<TEntity, TMetadata>, '$filter'> {
+export interface UseEntityOptions<TEntity, TMetadata = unknown> extends Omit<ODataQueryOptions<TEntity, TMetadata>, '$filter'> {
   enabled?: boolean
   staleTime?: number
   cacheTime?: number
@@ -237,7 +232,7 @@ export interface UseEntityOptions<TEntity, TMetadata = any> extends Omit<ODataQu
   refetchOnMount?: boolean
 }
 
-export interface UseEntityListOptions<TEntity, TMetadata = any> extends ODataQueryOptions<TEntity, TMetadata> {
+export interface UseEntityListOptions<TEntity, TMetadata = unknown> extends ODataQueryOptions<TEntity, TMetadata> {
   enabled?: boolean
   staleTime?: number
   cacheTime?: number
