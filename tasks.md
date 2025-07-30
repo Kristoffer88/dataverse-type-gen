@@ -33,40 +33,45 @@ Refactor large generator files into smaller, maintainable modules for better rea
 **✅ CONFIRMED**: App.tsx imports work correctly for basic entity types and interfaces.
 **⚠️ NOTE**: Found pre-existing bug in hooks generator (Phase 2) - import naming mismatch between `pum_gantttaskMetadata` (camelCase) and `pum_GanttTaskMetadata` (PascalCase). This will be fixed in Phase 2.
 
-## Phase 2: Split Query Hooks Generator (Priority: HIGH)
+## Phase 2: Split Query Hooks Generator (Priority: HIGH) ✅ COMPLETED
 **Target**: `src/generators/query-hooks.ts` (915 lines)
 
 ### Tasks:
-- [ ] Extract individual entity hooks → `src/generators/hooks/entity-hooks.ts`
-- [ ] Extract list/query hooks → `src/generators/hooks/list-hooks.ts`
-- [ ] Extract query builders → `src/generators/hooks/query-builders.ts`
-- [ ] Extract hook utilities → `src/generators/hooks/utilities.ts`
-- [ ] Create hooks module orchestrator → `src/generators/hooks/index.ts`
-- [ ] Update main query-hooks.ts imports
-- [ ] **TESTING**: Generate hooks with cache using different configs:
-  - [ ] Test hook file generation for different entities
-  - [ ] Verify React Query integration works
-  - [ ] Test with nested expand configurations
-- [ ] Verify generated hooks quality unchanged
-- [ ] Run quality gates: `pnpm build && pnpm check-types && pnpm lint`
+- [x] Extract individual entity hooks → `src/generators/hooks/entity-hooks.ts`
+- [x] Extract list/query hooks → `src/generators/hooks/list-hooks.ts`
+- [x] Extract query builders → `src/generators/hooks/query-builders.ts`
+- [x] Extract hook utilities → `src/generators/hooks/utilities.ts`
+- [x] Create hooks module orchestrator → `src/generators/hooks/index.ts`
+- [x] Update main query-hooks.ts imports
+- [x] **TESTING**: Generate hooks with cache using different configs:
+  - [x] Test hook file generation for different entities
+  - [x] Verify React Query integration works
+  - [x] Test with nested expand configurations
+- [x] Verify generated hooks quality unchanged
+- [x] Run quality gates: `pnpm build && pnpm check-types && pnpm lint`
+- [x] **BUG FIX**: Fixed hook generation for related entities - now only generates hooks for primary entities to prevent import errors
 
-## Phase 3: Split Code Generation Orchestrator (Priority: MEDIUM)
+**Result**: Successfully split 915-line file into 5 focused modules. Fixed critical bug where hooks were generated for all related entities but queries only for primary entities, causing import resolution errors.
+
+## Phase 3: Split Code Generation Orchestrator (Priority: MEDIUM) ✅ COMPLETED
 **Target**: `src/codegen/index.ts` (1109 lines)
 
 ### Tasks:
-- [ ] Extract file writing operations → `src/codegen/file-writer.ts`
-- [ ] Extract directory management → `src/codegen/directory-manager.ts`
-- [ ] Extract formatting utilities → `src/codegen/formatter.ts`
-- [ ] Extract result tracking → `src/codegen/result-tracking.ts`
-- [ ] Extract main orchestration → `src/codegen/orchestrator.ts`
-- [ ] Update main index.ts for clean exports
-- [ ] **TESTING**: Full generation pipeline with cache:
-  - [ ] Test directory organization features
-  - [ ] Test file formatting (prettier/eslint)
-  - [ ] Test result aggregation and reporting
-  - [ ] Test with various output configurations
-- [ ] Verify generation pipeline unchanged
-- [ ] Run quality gates: `pnpm build && pnpm check-types && pnpm lint`
+- [x] Extract file writing operations → `src/codegen/file-writer.ts`
+- [x] Extract directory management → `src/codegen/directory-manager.ts`
+- [x] Extract formatting utilities → `src/codegen/formatter.ts`
+- [x] Extract result tracking → `src/codegen/result-tracking.ts`
+- [x] Extract main orchestration → `src/codegen/orchestrator.ts`
+- [x] Update main index.ts for clean exports
+- [x] **TESTING**: Full generation pipeline with cache:
+  - [x] Test directory organization features
+  - [x] Test file formatting (prettier/eslint)
+  - [x] Test result aggregation and reporting
+  - [x] Test with various output configurations
+- [x] Verify generation pipeline unchanged
+- [x] Run quality gates: `pnpm build && pnpm check-types && pnpm lint`
+
+**Result**: Successfully split 1109-line file into 5 focused modules (avg ~220 lines each). Fixed DEFAULT_CONFIG naming conflict by renaming to DEFAULT_CODEGEN_CONFIG. Generation pipeline tested and verified working with cache. All quality gates pass.
 
 ## Phase 4: Split CLI Command Handler (Priority: MEDIUM)
 **Target**: `src/cli/index.ts` (1122 lines)
