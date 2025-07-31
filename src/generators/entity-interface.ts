@@ -45,11 +45,10 @@ export function generateEntityInterface(
   
   // Filter out auxiliary attributes if requested
   if (excludeAuxiliaryAttributes) {
-    const auxiliaryPrefixes = ['_', 'traverse', 'entity', 'yomi', 'exchange']
     attributesToProcess = attributesToProcess.filter(attr => 
-      !auxiliaryPrefixes.some(prefix => attr.logicalName.startsWith(prefix)) ||
-      attr.isPrimaryId ||
-      attr.logicalName === entityMetadata.primaryNameAttribute
+      !attr.attributeOf || // Exclude auxiliary attributes
+      attr.isPrimaryId ||  // Always include primary ID
+      attr.logicalName === entityMetadata.primaryNameAttribute // Always include primary name
     )
   }
 

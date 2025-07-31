@@ -286,7 +286,7 @@ const pumEntities = allEntities.filter(entity => entity.LogicalName.startsWith('
 
 ### 2025-07-24 - EntityDefinitions Parameter Support Investigation
 
-**Environment**: `https://ssopowerppm.crm4.dynamics.com/`
+**Environment**: `https://krapowerppm.crm4.dynamics.com/`
 **API Version**: `v9.1`
 
 **Findings**:
@@ -320,7 +320,7 @@ const pumEntities = allEntities.filter(entity => entity.LogicalName.startsWith('
 
 ### 2025-07-25 - OData String Functions Limitation Discovery
 
-**Environment**: `https://ssopowerppm.crm4.dynamics.com/`
+**Environment**: `https://krapowerppm.crm4.dynamics.com/`
 **API Version**: `v9.2`
 
 **Findings**:
@@ -348,7 +348,7 @@ const pumEntities = allEntities.filter(entity => entity.LogicalName.startsWith('
 
 ### 2025-07-24 - Complete Metadata Extraction Workflow (pum_initiative Analysis)
 
-**Environment**: `https://ssopowerppm.crm4.dynamics.com/`
+**Environment**: `https://krapowerppm.crm4.dynamics.com/`
 **API Version**: `v9.1`
 **Entity Analyzed**: `pum_initiative` (128 total attributes)
 

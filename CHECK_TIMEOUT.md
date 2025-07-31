@@ -4,7 +4,7 @@
 
 ### Command that timed out:
 ```bash
-DATAVERSE_CACHE_ENABLED=true DATAVERSE_INSTANCE=https://ssopowerppm.crm4.dynamics.com node dist/bin/cli.cjs cache cleanup
+DATAVERSE_CACHE_ENABLED=true DATAVERSE_INSTANCE=https://krapowerppm.crm4.dynamics.com node dist/bin/cli.cjs cache cleanup
 ```
 
 ### Symptoms:
@@ -48,7 +48,7 @@ Generated TypeScript files have import path issues causing compilation errors in
 
 ### Generation Command Used:
 ```bash
-DATAVERSE_CACHE_ENABLED=true DATAVERSE_INSTANCE=https://ssopowerppm.crm4.dynamics.com node dist/bin/cli.cjs generate --entities pum_initiative,pum_gantttask --generate-related-entities --output-dir pcf-demo/generated
+DATAVERSE_CACHE_ENABLED=true DATAVERSE_INSTANCE=https://krapowerppm.crm4.dynamics.com node dist/bin/cli.cjs generate --entities pum_initiative,pum_gantttask --generate-related-entities --output-dir pcf-demo/generated
 ```
 
 ### Status:

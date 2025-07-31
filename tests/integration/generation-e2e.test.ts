@@ -67,7 +67,7 @@ describe('Full Generation Pipeline Integration Tests', () => {
         expect(generatedCode.types).toBe('')
         
         // Check metadata object (interfaces now includes metadata)
-        expect(generatedCode.interfaces).toContain('AccountMetadata')
+        expect(generatedCode.interfaces).toContain('AccountMeta')
         expect(generatedCode.interfaces).toContain('logicalName: "account"')
         
         console.log('✅ Generated complete TypeScript definitions for account entity')

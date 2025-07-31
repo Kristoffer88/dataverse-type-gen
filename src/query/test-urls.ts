@@ -16,7 +16,7 @@ import {
 
 // Configure the URLs to use the actual Dataverse instance
 configureDataverseUrls({
-  instanceUrl: 'https://ssopowerppm.crm4.dynamics.com',
+  instanceUrl: 'https://krapowerppm.crm4.dynamics.com',
   apiVersion: 'v9.1'
 })
 

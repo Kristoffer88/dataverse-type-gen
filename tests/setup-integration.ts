@@ -60,5 +60,16 @@ export async function setupDataverse(): Promise<void> {
   return Promise.resolve()
 }
 
+// Enable cache for all integration tests to improve performance
+// Use long TTL and large cache for expensive operations (fetching 1000+ entities)
+process.env.DATAVERSE_CACHE_ENABLED = 'true'
+process.env.DATAVERSE_CACHE_TTL_HOURS = '168' // 1 week
+process.env.DATAVERSE_CACHE_MAX_SIZE_MB = '1000' // 1GB
+
+console.log('🎯 Cache Configuration for Tests:')
+console.log(`   Cache Enabled: ${process.env.DATAVERSE_CACHE_ENABLED}`)
+console.log(`   Cache TTL: ${process.env.DATAVERSE_CACHE_TTL_HOURS} hours`)
+console.log(`   Cache Size: ${process.env.DATAVERSE_CACHE_MAX_SIZE_MB}MB`)
+
 // Auto-validate when this module is imported
 validateIntegrationEnvironment()

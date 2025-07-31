@@ -25,7 +25,7 @@ import { pum_ProgramMetadata } from '../../test-output/pum-hooks/pum_program.js'
 import { pum_PortfolioMetadata } from '../../test-output/pum-hooks/pum_portfolio.js'
 
 // Configure Dataverse instance
-const DATAVERSE_URL = 'https://ssopowerppm.crm4.dynamics.com'
+const DATAVERSE_URL = 'https://krapowerppm.crm4.dynamics.com'
 
 beforeAll(async () => {
   await setupDataverse()

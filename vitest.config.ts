@@ -10,7 +10,7 @@ export default defineConfig({
       // Load .env file for tests
       NODE_ENV: 'test'
     },
-    setupFiles: ['./tests/setup-env.ts'],
+    setupFiles: ['./tests/setup-env.ts', './tests/setup-integration.ts'],
     include: [
       'src/**/*.test.ts',
       'tests/unit/**/*.test.ts',

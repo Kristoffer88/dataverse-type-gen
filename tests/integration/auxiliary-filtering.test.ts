@@ -39,16 +39,16 @@ describe('Auxiliary Attribute Filtering', () => {
     const auxiliaryAttributeNames = auxiliaryAttributes.map(attr => attr.logicalName)
     for (const auxAttrName of auxiliaryAttributeNames.slice(0, 5)) { // Check first 5
       console.log(`   Testing ${auxAttrName}...`)
-      expect(interfaceWithFiltering).not.toContain(`/** ${auxAttrName} `)
-      expect(interfaceWithoutFiltering).toContain(`/** ${auxAttrName} `)
+      expect(interfaceWithFiltering).not.toContain(`${auxAttrName}?:`)
+      expect(interfaceWithoutFiltering).toContain(`${auxAttrName}?:`)
     }
     
     // Verify that primary attributes ARE in both interfaces
     const primaryAttributeNames = primaryAttributes.map(attr => attr.logicalName)
     for (const primaryAttrName of primaryAttributeNames.slice(0, 3)) { // Check first 3
       console.log(`   Primary attribute ${primaryAttrName} should be in both`)
-      expect(interfaceWithFiltering).toContain(`/** ${primaryAttrName} `)
-      expect(interfaceWithoutFiltering).toContain(`/** ${primaryAttrName} `)
+      expect(interfaceWithFiltering).toContain(`${primaryAttrName}?:`)
+      expect(interfaceWithoutFiltering).toContain(`${primaryAttrName}?:`)
     }
     
     console.log(`\n✅ Filtering test passed!`)

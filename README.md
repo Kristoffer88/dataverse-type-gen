@@ -12,9 +12,10 @@ Generate TypeScript types from Microsoft Dataverse metadata with enterprise-grad
 - 🔄 **Live Metadata**: Uses Dataverse Web API endpoints with real-time data
 - 🎯 **Flexible Filtering**: Generate types by entities, publisher, or solution
 - 📝 **Complete Types**: Interfaces, enums, create/update types, and metadata
-- ⚡ **Optimized**: Efficient metadata processing with caching
-- 🔒 **Secure**: Azure Identity integration with token caching
-- 🛠️ **Developer-Friendly**: Dry-run, debug modes, and JSON output
+- ⚡ **Optimized**: Efficient metadata processing with intelligent rate limiting
+- 🔒 **Secure**: Azure Identity integration with secure token handling
+- 🛠️ **Developer-Friendly**: Progress indicators, dry-run, debug modes, and JSON output
+- 🎯 **Smart Filtering**: Auxiliary attribute filtering and nested expand support
 
 ## Quick Start
 
@@ -104,8 +105,11 @@ npx dataverse-type-gen generate --entities account --output-dir ./src/types --fi
 # Configuration file support
 npx dataverse-type-gen generate --config ./dataverse.config.json
 
-# Disable specific features
-npx dataverse-type-gen generate --entities account --no-comments --no-metadata
+# Filter out auxiliary attributes for cleaner interfaces
+npx dataverse-type-gen generate --entities account --exclude-auxiliary-attributes
+
+# Generate with nested expand support for complex relationships
+npx dataverse-type-gen generate --entities account --generate-related-entities --nested-expand
 ```
 
 ## Generated Types
@@ -202,9 +206,9 @@ const { data: account } = useAccount(accountId, {
 })
 ```
 
-### Query Builders (Recommended)
+### Query Builders with Type-Safe Filtering
 
-**🎯 New Approach**: The generator now creates transparent, modifiable query builders alongside hooks. This gives you full control and visibility over URL construction:
+**🎯 Enhanced Query Building**: The generator creates transparent, modifiable query builders with type-safe OData filtering. This gives you full control and visibility over URL construction:
 
 ```typescript
 import { AccountQueries } from './generated/queries/account.queries'
@@ -247,6 +251,67 @@ import { AccountQueries } from './generated/queries/account.queries'
 const url = AccountQueries.buildListUrl(options)
 ```
 
+## Advanced Features
+
+### 🧹 Auxiliary Attribute Filtering  
+
+Clean up generated interfaces by filtering out auxiliary attributes:
+
+```bash
+# Generate cleaner interfaces without auxiliary attributes
+npx dataverse-type-gen generate --entities account --exclude-auxiliary-attributes
+```
+
+**Before filtering:**
+```typescript
+export interface Account {
+  accountid?: string
+  name?: string
+  createdbyname?: string        // Auxiliary attribute
+  createdbyyominame?: string    // Auxiliary attribute  
+  modifiedbyname?: string       // Auxiliary attribute
+  // ... 50+ more auxiliary attributes
+}
+```
+
+**After filtering:**
+```typescript
+export interface Account {
+  accountid?: string
+  name?: string
+  createdby?: string           // Primary lookup attribute
+  modifiedby?: string          // Primary lookup attribute
+  // ... only essential attributes
+}
+```
+
+### 🔗 Nested Expand Support
+
+Generate complete type definitions for complex entity relationships:
+
+```bash
+# Enable nested expand for comprehensive type coverage
+npx dataverse-type-gen generate --entities account --generate-related-entities --nested-expand
+```
+
+This creates type-safe expand interfaces for deep relationship navigation:
+
+```typescript
+// Generated expand types support nested relationships
+const accounts = await fetch(AccountQueries.buildListUrl({
+  $expand: {
+    primarycontactid: {
+      $select: ['fullname', 'emailaddress1'],
+      $expand: {
+        parentcustomerid: {
+          $select: ['name']
+        }
+      }
+    }
+  }
+}))
+```
+
 ## CLI Commands
 
 ### `generate` - Generate TypeScript Types
@@ -258,14 +323,17 @@ Filtering Options:
   -e, --entities <entities>     Comma-separated entity logical names
   -p, --publisher <prefix>      Publisher prefix to filter entities  
   -s, --solution <name>         Solution name to filter entities
+  --exclude-auxiliary-attributes Exclude auxiliary attributes from interfaces
+  --generate-related-entities   Include related entities in generation
 
 Output Options:
   -o, --output-dir <dir>        Output directory (default: ./generated)
   --file-extension <ext>        File extension (.ts or .d.ts)
   --no-comments                 Exclude comments from generated code
-  --no-metadata                 Exclude metadata objects
+  --no-metadata                 Exclude metadata objects  
   --no-validation               Exclude validation functions
   --no-overwrite                Do not overwrite existing files
+  --nested-expand               Generate nested expand types for relationships
 
 Connection Options:
   --dataverse-url <url>         Dataverse instance URL
@@ -341,6 +409,8 @@ Shows:
   "includeComments": true,
   "includeMetadata": true,
   "includeValidation": true,
+  "excludeAuxiliaryAttributes": true,
+  "generateRelatedEntities": true,
   "entities": [
     "account",
     "contact",
@@ -349,7 +419,10 @@ Shows:
   "publisher": "your_prefix",
   "solution": "Your Solution Name",
   "typeGenerationOptions": {
-    "useExactTypes": true
+    "useExactTypes": true,
+    "nestedExpand": true,
+    "generateHooks": true,
+    "includeBindingTypes": true
   }
 }
 ```
@@ -359,6 +432,7 @@ Shows:
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `DATAVERSE_INSTANCE` | Dataverse instance URL | `https://yourorg.crm.dynamics.com` |
+| `DATAVERSE_CACHE_ENABLED` | Enable API caching (development/testing only) | `true` |
 
 ## Authentication
 

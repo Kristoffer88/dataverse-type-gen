@@ -87,7 +87,9 @@ export function generateExpandTypes(
         // Look up the actual schema name from the processed entities using our metadata lookup
         const relatedEntity = entityLookup.get(info.targetEntityLogicalName)
         if (!relatedEntity) {
-          throw new Error(`Entity metadata not found for target entity: ${info.targetEntityLogicalName}. This entity should be included in the allEntities array passed to generateExpandTypes.`)
+          // Skip this relationship if target entity metadata is not available
+          // This allows single-entity generation to work without all related entities
+          return
         }
         const targetSchemaName = sanitizeInterfaceName(relatedEntity.schemaName)
         

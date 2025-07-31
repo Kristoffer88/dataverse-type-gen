@@ -25,10 +25,11 @@ describe('CLI Configuration Test', () => {
     const auxiliaryAttributes = processed.attributes.filter(attr => attr.attributeOf)
     console.log(`🔗 Found ${auxiliaryAttributes.length} auxiliary attributes`)
     
-    // Generate file using the same options as CLI, but disable binding types to avoid missing entity errors
+    // Generate file using the same options as CLI, but disable expand/binding types to avoid missing entity errors
     const generationOptions = { 
       ...codeGenConfig.typeGenerationOptions!, 
-      includeBindingTypes: false 
+      includeBindingTypes: false,
+      nestedExpand: false
     }
     const generatedCode = generateEntityFile(processed, generationOptions, [])
     

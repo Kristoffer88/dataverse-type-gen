@@ -6,7 +6,7 @@ const { exec } = require('child_process');
 function makeApiCall() {
   return new Promise((resolve, reject) => {
     // Use the CLI binary to get an access token and make the call
-    const cmd = `export DATAVERSE_INSTANCE=https://ssopowerppm.crm4.dynamics.com && node -e "
+    const cmd = `export DATAVERSE_INSTANCE=https://krapowerppm.crm4.dynamics.com && node -e "
       const { createAuthenticatedFetcher } = require('./dist/bin/cli.cjs');
       
       async function test() {

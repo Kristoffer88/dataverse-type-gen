@@ -73,7 +73,9 @@ export function generateBindingTypes(
       const target = targets[0]
       const targetEntity = entityLookup.get(target)
       if (!targetEntity) {
-        throw new Error(`Entity metadata not found for target entity: ${target}. This entity should be included in the allEntities array passed to generateBindingTypes.`)
+        // Skip this lookup if target entity metadata is not available
+        // This allows single-entity generation to work without all related entities
+        continue
       }
       const entitySet = targetEntity.entitySetName
       lines.push(`  /** Create @odata.bind for ${attr.logicalName} -> ${target} */`)
@@ -82,14 +84,19 @@ export function generateBindingTypes(
       lines.push(`  }),`)
     } else if (targets.length > 1) {
       // Multiple targets - require entity type parameter
-      lines.push(`  /** Create @odata.bind for ${attr.logicalName} -> ${targets.join(' | ')} */`)
-      lines.push(`  ${functionName}: (id: string, entityType: '${targets.join("' | '")}') => {`)
+      // Filter out targets that don't have metadata available
+      const availableTargets = targets.filter(target => entityLookup.has(target))
+      
+      if (availableTargets.length === 0) {
+        // Skip this lookup if no target entities are available
+        continue
+      }
+      
+      lines.push(`  /** Create @odata.bind for ${attr.logicalName} -> ${availableTargets.join(' | ')} */`)
+      lines.push(`  ${functionName}: (id: string, entityType: '${availableTargets.join("' | '")}') => {`)
       lines.push(`    const entitySets = {`)
-      targets.forEach(target => {
-        const targetEntity = entityLookup.get(target)
-        if (!targetEntity) {
-          throw new Error(`Entity metadata not found for target entity: ${target}. This entity should be included in the allEntities array passed to generateBindingTypes.`)
-        }
+      availableTargets.forEach(target => {
+        const targetEntity = entityLookup.get(target)!
         const entitySet = targetEntity.entitySetName
         lines.push(`      '${target}': '${entitySet}',`)
       })

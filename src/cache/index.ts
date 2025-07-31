@@ -40,29 +40,24 @@ function generateCacheKey(url: string, options: RequestInit = {}): string {
   const normalizedUrl = url.toLowerCase().trim()
   const method = (options.method || 'GET').toUpperCase()
   
-  // Only include headers that affect response
+  // Only include headers that affect response (exclude authorization since tokens change frequently)
   const relevantHeaders: Record<string, string> = {}
   if (options.headers) {
     const headers = options.headers as Record<string, string>
-    // Include authentication and content negotiation headers
+    // Include content negotiation headers but NOT authorization (tokens change)
     for (const [key, value] of Object.entries(headers)) {
       const lowerKey = key.toLowerCase()
-      if (lowerKey.includes('authorization') || 
-          lowerKey.includes('accept') || 
+      if (lowerKey.includes('accept') || 
           lowerKey.includes('prefer')) {
         relevantHeaders[lowerKey] = value
       }
     }
   }
   
-  // Hour-based timestamp for cache invalidation
-  const hourTimestamp = Math.floor(Date.now() / (1000 * 60 * 60))
-  
   const keyData = {
     url: normalizedUrl,
     method,
-    headers: relevantHeaders,
-    timestamp: hourTimestamp
+    headers: relevantHeaders
   }
   
   return crypto.createHash('sha256')
@@ -144,7 +139,7 @@ export async function getFromCache(url: string, options: RequestInit = {}): Prom
         return null
       }
       
-      // Cache hit - no logging needed for clean output
+      // Cache hit
       
       // Return exact same Response object structure
       return new Response(cached.body, {
@@ -154,7 +149,7 @@ export async function getFromCache(url: string, options: RequestInit = {}): Prom
       })
       
     } catch {
-      // Cache file doesn't exist or is invalid
+      // Cache file doesn't exist or is invalid - cache miss
       return null
     }
     
