@@ -8,14 +8,14 @@ Generate TypeScript types from Microsoft Dataverse metadata with enterprise-grad
 
 ## Features
 
-- 🚀 **Enterprise CLI**: Modern command-line interface with 2025 best practices
-- 🔄 **Live Metadata**: Uses Dataverse Web API endpoints with real-time data
+- 🚀 **CLI Interface**: Command-line tool for automated type generation
+- 🔄 **Live Metadata**: Uses Dataverse Web API endpoints for current data
 - 🎯 **Flexible Filtering**: Generate types by entities, publisher, or solution
 - 📝 **Complete Types**: Interfaces, enums, create/update types, and metadata
-- ⚡ **Optimized**: Efficient metadata processing with intelligent rate limiting
-- 🔒 **Secure**: Azure Identity integration with secure token handling
-- 🛠️ **Developer-Friendly**: Progress indicators, dry-run, debug modes, and JSON output
-- 🎯 **Smart Filtering**: Auxiliary attribute filtering and nested expand support
+- ⚡ **Performance**: Efficient metadata processing with rate limiting
+- 🔒 **Authentication**: Azure Identity integration for secure access
+- 🛠️ **Development Tools**: Progress indicators, dry-run, debug modes, and JSON output
+- 🎯 **Attribute Filtering**: Exclude auxiliary attributes and support nested expand
 
 ## Quick Start
 
@@ -78,9 +78,9 @@ Or specify via CLI:
 npx dataverse-type-gen generate --dataverse-url https://yourorg.crm.dynamics.com --entities account
 ```
 
-## Modern CLI Features
+## CLI Features
 
-### 🎯 Production-Ready Options
+### 🎯 Options
 
 ```bash
 # Dry-run mode - preview without creating files
@@ -96,7 +96,7 @@ npx dataverse-type-gen generate --entities account --debug
 npx dataverse-type-gen generate --entities account --output-format json
 ```
 
-### ⚙️ Advanced Configuration
+### ⚙️ Configuration
 
 ```bash
 # Custom output directory and file extension
@@ -208,7 +208,7 @@ const { data: account } = useAccount(accountId, {
 
 ### Query Builders with Type-Safe Filtering
 
-**🎯 Enhanced Query Building**: The generator creates transparent, modifiable query builders with type-safe OData filtering. This gives you full control and visibility over URL construction:
+**Query Building**: The generator creates query builders with type-safe OData filtering for URL construction:
 
 ```typescript
 import { AccountQueries } from './generated/queries/account.queries'
@@ -231,13 +231,13 @@ const countUrl = AccountQueries.buildCountUrl({
 })
 ```
 
-**Why Query Builders are Better:**
+**Query Builder Benefits:**
 
-- ✅ **Transparent**: You can see and modify the generated code
-- ✅ **Debuggable**: No abstraction layer to troubleshoot through
-- ✅ **Customizable**: Edit the generated functions for specific needs
-- ✅ **Type-safe**: Full TypeScript support with entity-specific types
-- ✅ **Self-contained**: Each entity has its own complete query logic
+- ✅ **Transparent**: Generated code is visible and modifiable
+- ✅ **Debuggable**: No abstraction layer to troubleshoot
+- ✅ **Customizable**: Edit generated functions for specific needs
+- ✅ **Type-safe**: TypeScript support with entity-specific types
+- ✅ **Self-contained**: Each entity has its own query logic
 
 **Migration from DataverseUrls:**
 
@@ -251,7 +251,7 @@ import { AccountQueries } from './generated/queries/account.queries'
 const url = AccountQueries.buildListUrl(options)
 ```
 
-## Advanced Features
+## Additional Features
 
 ### 🧹 Auxiliary Attribute Filtering  
 
