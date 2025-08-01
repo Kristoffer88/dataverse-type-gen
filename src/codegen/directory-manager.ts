@@ -15,7 +15,7 @@ export function isPrimaryEntity(entityLogicalName: string, primaryEntities: stri
 export function getEntityDirectory(entityLogicalName: string, config: CodeGenConfig): string {
   // Check if directory organization should be enabled
   const shouldOrganizeDirectories = config.relatedEntitiesDir && 
-    (config.typeGenerationOptions.nestedExpand || config.primaryEntities?.length);
+    (config.typeGenerationOptions.fullMetadata || config.primaryEntities?.length);
   
   if (!shouldOrganizeDirectories || isPrimaryEntity(entityLogicalName, config.primaryEntities)) {
     return config.outputDir // Primary entities go in root

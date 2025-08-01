@@ -2,21 +2,18 @@
   "dataverseUrl": "https://krapowerppm.crm4.dynamics.com",
   "outputDir": "pcf-demo/generated",
   "fileExtension": ".ts",
-  "includeComments": true,
-  "includeMetadata": true,
-  "includeValidation": true,
   "entities": ["pum_gantttask", "pum_initiative"],
-  "nestedExpand": true,
+  "fullMetadata": false,
   "typeGeneration": {
-    "useExactTypes": true,
-    "generateHooks": true,
     "includeComments": true,
     "includeMetadata": true,
-    "includeValidation": true
+    "includeValidation": true,
+    "useExactTypes": true,
+    "generateHooks": true
   },
   "cache": {
-      "enabled": true,
-      "ttlHours": 24,
-      "maxSizeMB": 500
-    }
+    "enabled": true,
+    "ttlHours": 168,
+    "maxSizeMB": 500
+  }
 }

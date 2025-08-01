@@ -83,8 +83,8 @@ export function getHooksToSharedImportPath(
  */
 export function shouldOrganizeDirectories(
   relatedEntitiesDir: string | undefined,
-  nestedExpand: boolean,
+  fullMetadata: boolean,
   primaryEntities: string[] = []
 ): boolean {
-  return !!(relatedEntitiesDir && (nestedExpand || primaryEntities.length > 0))
+  return !!(relatedEntitiesDir && (fullMetadata || primaryEntities.length > 0))
 }

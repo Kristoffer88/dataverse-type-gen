@@ -23,7 +23,7 @@ export interface TypeGenerationOptions {
   includeLookupValues?: boolean
   includeBindingTypes?: boolean
   excludeAuxiliaryAttributes?: boolean
-  nestedExpand?: boolean
+  fullMetadata?: boolean
   excludeSystemAuditRelationships?: boolean
   // Directory structure options
   primaryEntities?: string[]
@@ -73,8 +73,8 @@ export function generateEntityFile(
   const imports: Set<string> = new Set()
 
   // Directory organization configuration
-  const { primaryEntities = [], relatedEntitiesDir = 'related', nestedExpand = false } = options
-  const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, nestedExpand, primaryEntities)
+  const { primaryEntities = [], relatedEntitiesDir = 'related', fullMetadata = false } = options
+  const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, fullMetadata, primaryEntities)
 
   // File header
   lines.push(`// Generated TypeScript definitions for ${entityMetadata.schemaName}`)

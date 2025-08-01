@@ -29,7 +29,7 @@ describe('CLI Configuration Test', () => {
     const generationOptions = { 
       ...codeGenConfig.typeGenerationOptions!, 
       includeBindingTypes: false,
-      nestedExpand: false
+      fullMetadata: false
     }
     const generatedCode = generateEntityFile(processed, generationOptions, [])
     

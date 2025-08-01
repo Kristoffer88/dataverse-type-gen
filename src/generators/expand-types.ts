@@ -11,8 +11,8 @@ export function generateExpandTypes(
   options: TypeGenerationOptions = {},
   allEntities: ProcessedEntityMetadata[] = []
 ): { expandTypes: string, relatedEntityImports: string[] } {
-  const { includeComments = true, nestedExpand = false, primaryEntities = [], relatedEntitiesDir = 'related' } = options
-  const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, nestedExpand, primaryEntities)
+  const { includeComments = true, fullMetadata = false, primaryEntities = [], relatedEntitiesDir = 'related' } = options
+  const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, fullMetadata, primaryEntities)
   const lines: string[] = []
   const schemaName = sanitizeInterfaceName(entityMetadata.schemaName)
   const relatedEntityImports: string[] = []
@@ -55,7 +55,7 @@ export function generateExpandTypes(
   // Generate expand type with both array and object support
   const expandTypeName = `${schemaName}Expand`
   
-  if (nestedExpand) {
+  if (fullMetadata) {
     // Advanced mode: Full type-safe expand support with all related entity imports
     lines.push(`export type ${expandTypeName} =`)
     lines.push(`  | ${expandablePropsTypeName}[]`) // Array format

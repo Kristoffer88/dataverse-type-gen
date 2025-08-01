@@ -238,7 +238,7 @@ export type ProgressCallback = (current: number, total: number, entityName?: str
 
 /**
  * Fetch ALL entity metadata from Dataverse for complete type safety
- * Used when nestedExpand is enabled in configuration
+ * Used when fullMetadata is enabled in configuration
  */
 export async function fetchAllEntityMetadata(
   options: FetchEntityMetadataOptions & { onProgress?: ProgressCallback } = {}

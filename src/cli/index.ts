@@ -34,10 +34,9 @@ export function setupCLI(): Command {
     .option('--no-metadata', 'Exclude metadata objects')
     .option('--no-validation', 'Exclude validation functions')
     .option('--no-overwrite', 'Do not overwrite existing files')
-    .option('--generate-related-entities', 'Generate metadata for related entities to enable type-safe nested expands')
-    .option('--max-related-depth <depth>', 'Maximum depth for related entity generation (prevents infinite recursion)', '2')
-    .option('--nested-expand', 'Generate ALL entities for complete type safety (replaces generate-related-entities)')
+    .option('--full-metadata', 'Generate ALL entities from Dataverse for complete type safety (slower initial run)')
     .option('-c, --config <path>', 'Configuration file path')
+    .option('--no-config-file', 'Skip loading configuration file (use only CLI arguments and defaults)')
     .option('-v, --verbose', 'Verbose output')
     .option('--debug', 'Enable debug mode with detailed logging')
     .option('-q, --quiet', 'Suppress non-error output')
@@ -52,9 +51,10 @@ Examples:
   $ dataverse-type-gen generate --dataverse-url https://yourorg.crm.dynamics.com --publisher prefix
   $ dataverse-type-gen generate --solution "My Custom Solution" --output-format json
   $ dataverse-type-gen generate --config ./custom-config.json --verbose
-  $ dataverse-type-gen generate --entities pum_initiative --generate-related-entities --max-related-depth 3
-  $ dataverse-type-gen generate --publisher pum --generate-related-entities
-  $ dataverse-type-gen generate --entities pum_initiative --nested-expand`)
+  $ dataverse-type-gen generate --entities pum_initiative
+  $ dataverse-type-gen generate --publisher pum
+  $ dataverse-type-gen generate --entities pum_initiative --full-metadata
+  $ dataverse-type-gen generate --entities pum_initiative --no-config-file`)
     .action(generateCommand)
   
   // Init command

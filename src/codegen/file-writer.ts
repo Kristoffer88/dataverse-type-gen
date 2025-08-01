@@ -92,7 +92,7 @@ export async function writeEntityHooksFile(
     
     // Check if directory organization should be enabled
     const shouldOrganizeDirectories = config.relatedEntitiesDir && 
-      (config.typeGenerationOptions.nestedExpand || config.primaryEntities?.length);
+      (config.typeGenerationOptions.fullMetadata || config.primaryEntities?.length);
     
     const hooksDir = !shouldOrganizeDirectories || isPrimaryEntity(entityMetadata.logicalName, config.primaryEntities) 
       ? hooksBaseDir 
@@ -133,7 +133,7 @@ export async function writeEntityHooksFile(
     
     // Check if directory organization should be enabled
     const shouldOrganizeDirectories = config.relatedEntitiesDir && 
-      (config.typeGenerationOptions.nestedExpand || config.primaryEntities?.length);
+      (config.typeGenerationOptions.fullMetadata || config.primaryEntities?.length);
     
     const hooksDir = !shouldOrganizeDirectories || isPrimaryEntity(entityMetadata.logicalName, config.primaryEntities) 
       ? hooksBaseDir 
@@ -170,7 +170,7 @@ export async function writeEntityQueryBuildersFile(
     
     // Check if directory organization should be enabled
     const shouldOrganizeDirectories = config.relatedEntitiesDir && 
-      (config.typeGenerationOptions.nestedExpand || config.primaryEntities?.length);
+      (config.typeGenerationOptions.fullMetadata || config.primaryEntities?.length);
     
     const queriesDir = !shouldOrganizeDirectories || isPrimaryEntity(entityMetadata.logicalName, config.primaryEntities) 
       ? queriesBaseDir 
@@ -211,7 +211,7 @@ export async function writeEntityQueryBuildersFile(
     
     // Check if directory organization should be enabled
     const shouldOrganizeDirectories = config.relatedEntitiesDir && 
-      (config.typeGenerationOptions.nestedExpand || config.primaryEntities?.length);
+      (config.typeGenerationOptions.fullMetadata || config.primaryEntities?.length);
     
     const queriesDir = !shouldOrganizeDirectories || isPrimaryEntity(entityMetadata.logicalName, config.primaryEntities) 
       ? queriesBaseDir 

@@ -59,7 +59,7 @@ export function generateEntityHooks(
   const primaryKey = entityMetadata.primaryIdAttribute
   
   // Determine import paths based on directory structure
-  const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, options.nestedExpand ?? false, primaryEntities)
+  const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, options.fullMetadata ?? false, primaryEntities)
   const entityImportPath = organizingDirectories 
     ? getHooksToEntityImportPath(entityMetadata.logicalName, primaryEntities, relatedEntitiesDir)
     : `../${entityMetadata.logicalName.toLowerCase()}.js`

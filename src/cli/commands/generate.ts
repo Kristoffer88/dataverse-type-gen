@@ -13,6 +13,7 @@ import {
 import { 
   loadConfiguration,
   toCodeGenConfig,
+  DEFAULT_CONFIG,
   type DataverseTypeGenConfig 
 } from '../../config/index.js'
 import { SimpleLogger } from '../output/formatters.js'
@@ -39,9 +40,19 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       logger.info('🔍 Running in dry-run mode - no files will be generated')
     }
     
-    // Load configuration using the proper config system
-    const dataverseConfig = await loadConfiguration(options.config as string)
-    const configFromFile = convertToCliConfig(dataverseConfig)
+    // Load configuration using the proper config system (unless --no-config-file is specified)
+    const skipConfigFile = options.configFile === false
+    if (skipConfigFile) {
+      logger.debugLog('⚠️  Skipping configuration file loading (--no-config-file)')
+    }
+    
+    let configFromFile: Partial<CLIConfig>
+    if (skipConfigFile) {
+      configFromFile = {} // Empty config when skipping config file - use only defaults + CLI
+    } else {
+      const loadedConfig = await loadConfiguration(options.config as string)
+      configFromFile = convertToCliConfig(loadedConfig)
+    }
     
     // Merge: defaults < config file < explicit CLI options  
     // Only include CLI options that were explicitly provided (not undefined)
@@ -56,14 +67,8 @@ export async function generateCommand(options: Record<string, unknown>): Promise
     const config = { ...DEFAULT_CLI_CONFIG, ...configFromFile, ...explicitCliOptions }
     
     // Parse CLI-specific options that need type conversion
-    if (options.maxRelatedDepth) {
-      config.maxRelatedEntityDepth = parseInt(options.maxRelatedDepth as string, 10)
-    }
-    if (options.generateRelatedEntities !== undefined) {
-      config.generateRelatedEntities = Boolean(options.generateRelatedEntities)
-    }
-    if (options.nestedExpand !== undefined) {
-      config.nestedExpand = Boolean(options.nestedExpand)
+    if (options.fullMetadata !== undefined) {
+      config.fullMetadata = Boolean(options.fullMetadata)
     }
     
     // Validate inputs before proceeding
@@ -150,9 +155,9 @@ export async function generateCommand(options: Record<string, unknown>): Promise
     let processedEntities: ProcessedEntityMetadata[] = []
     let allEntitiesForLookup: ProcessedEntityMetadata[] = []
     
-    if (config.nestedExpand) {
-      // NEW APPROACH: Fetch ALL entities for complete type safety
-      logger.info(`🌍 Using nestedExpand mode - fetching ALL entities for complete type safety...`)
+    if (config.fullMetadata) {
+      // FULL METADATA APPROACH: Fetch ALL entities for complete type safety
+      logger.info(`🌍 Using full metadata mode - fetching ALL entities for complete type safety...`)
       logger.info(`⚠️  This will take several minutes due to API rate limiting (respecting Dataverse limits)`)
       
       const allEntityMetadata = await fetchAllEntityMetadata({
@@ -231,9 +236,9 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       // Copy primary entities to allEntitiesForLookup
       allEntitiesForLookup = [...processedEntities]
 
-      // Process related entities if enabled (old behavior)
-      if (config.generateRelatedEntities && processedEntities.length > 0) {
-        logger.info(`🔗 Discovering related entities (max depth: ${config.maxRelatedEntityDepth})...`)
+      // Process related entities (always enabled in v1 for better type safety)
+      if (processedEntities.length > 0) {
+        logger.info(`🔗 Discovering related entities...`)
         
         // Collect all unique related entity logical names
         const relatedEntityNames = new Set<string>()
@@ -308,20 +313,19 @@ export async function generateCommand(options: Record<string, unknown>): Promise
     
     logger.info(`📝 Generating TypeScript files in ${config.outputDir}...`)
     
-    // Convert back to DataverseTypeGenConfig format and use the proper transformation
+    // Convert back to DataverseTypeGenConfig format and use the proper transformation  
+    const baseConfig = skipConfigFile ? DEFAULT_CONFIG : await loadConfiguration(options.config as string)
     const finalDataverseConfig: DataverseTypeGenConfig = {
-      ...dataverseConfig,
+      ...baseConfig,
       // Override with any CLI options that were provided
       outputDir: config.outputDir,
       fileExtension: config.fileExtension,
-      entities: entitiesToProcess.length > 0 ? entitiesToProcess : dataverseConfig.entities,
+      entities: entitiesToProcess.length > 0 ? entitiesToProcess : baseConfig.entities,
       publisher: config.publisher,
       solution: config.solution,
-      generateRelatedEntities: config.generateRelatedEntities,
-      maxRelatedEntityDepth: config.maxRelatedEntityDepth,
-      nestedExpand: config.nestedExpand,
+      fullMetadata: config.fullMetadata,
       typeGeneration: {
-        ...dataverseConfig.typeGeneration,
+        ...baseConfig.typeGeneration,
         includeComments: config.includeComments,
         includeMetadata: config.includeMetadata,
         includeValidation: config.includeValidation,
@@ -331,7 +335,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
     const codeGenConfig: Partial<CodeGenConfig> = toCodeGenConfig(finalDataverseConfig)
     
     // For the generate function, we need to separate primary entities from related entities
-    // In nestedExpand mode, all entities except primary ones are "related entities"
+    // In full metadata mode, all entities except primary ones are "related entities"
     const relatedEntities = allEntitiesForLookup.filter(entity => 
       !processedEntities.some(primary => primary.logicalName === entity.logicalName)
     )

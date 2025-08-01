@@ -13,9 +13,7 @@ export interface CLIConfig {
   includeComments: boolean
   includeMetadata: boolean
   includeValidation: boolean
-  generateRelatedEntities: boolean
-  maxRelatedEntityDepth: number
-  nestedExpand: boolean
+  fullMetadata: boolean
   overwrite: boolean
   verbose: boolean
   debug: boolean
@@ -34,9 +32,7 @@ export const DEFAULT_CLI_CONFIG: CLIConfig = {
   includeComments: true,
   includeMetadata: true,
   includeValidation: true,
-  generateRelatedEntities: false, // Default to false for CLI to avoid unexpected behavior
-  maxRelatedEntityDepth: 2,
-  nestedExpand: false, // Default to false for backward compatibility
+  fullMetadata: false, // Default to false for performance
   overwrite: true,
   verbose: false,
   debug: false,
@@ -59,9 +55,7 @@ export function convertToCliConfig(config: DataverseTypeGenConfig): Partial<CLIC
     includeComments: config.typeGeneration.includeComments ?? true,
     includeMetadata: config.typeGeneration.includeMetadata ?? true,
     includeValidation: config.typeGeneration.includeValidation ?? true,
-    generateRelatedEntities: config.generateRelatedEntities ?? false,
-    maxRelatedEntityDepth: config.maxRelatedEntityDepth ?? 2,
-    nestedExpand: config.nestedExpand ?? false,
+    fullMetadata: config.fullMetadata ?? false,
     overwrite: true, // Always overwrite for CLI
     verbose: false,
     debug: false,
