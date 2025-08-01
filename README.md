@@ -232,117 +232,57 @@ export interface Account {
 }
 ```
 
-### Nested Expand Support
+### Type-Safe Expand Support
 
-Generate complete type definitions for complex entity relationships:
-
-```bash
-# Enable nested expand for comprehensive type coverage
-npx dataverse-type-gen generate --entities account --generate-related-entities --nested-expand
-```
-
-This creates type-safe expand interfaces for deep relationship navigation:
+Fully type-safe expand with IntelliSense and compile-time validation:
 
 ```typescript
-// Generated expand types support nested relationships
-const accounts = await fetch(AccountQueries.buildListUrl({
+// ✅ Type-safe expand with field selection and filtering
+const ganttTasks = await fetch(pum_GanttTaskQueries.buildListUrl({
   $expand: {
-    primarycontactid: {
-      $select: ['fullname', 'emailaddress1'],
-      $expand: {
-        parentcustomerid: {
-          $select: ['name']
-        }
-      }
+    pum_initiative: {
+      $select: ['pum_name', 'pum_description'], // ✅ IntelliSense for Initiative fields
+      $filter: { statecode: 0 }, // ✅ Type-safe filtering on Initiative
+      $orderby: { createdon: 'desc' }, // ✅ Type-safe ordering
+      $top: 5
     }
   }
 }))
+
+// ❌ TypeScript will catch invalid field names:
+// $select: ['invalid_field'] // Error: not assignable to keyof pum_Initiative
 ```
 
-## CLI Commands
+## CLI Usage
 
-### `generate` - Generate TypeScript Types
+### Basic Commands
 
 ```bash
-dataverse-type-gen generate [options]
+# Generate types for specific entities
+npx dataverse-type-gen generate --entities account,contact,opportunity
 
-Filtering Options:
-  -e, --entities <entities>     Comma-separated entity logical names
-  -p, --publisher <prefix>      Publisher prefix to filter entities  
-  -s, --solution <name>         Solution name to filter entities
-  --full-metadata               Generate ALL entities for complete type safety
+# Generate types by publisher prefix
+npx dataverse-type-gen generate --publisher your_prefix
 
-Output Options:
-  -o, --output-dir <dir>        Output directory (default: ./generated)
-  --file-extension <ext>        File extension (.ts or .d.ts)
-  --no-comments                 Exclude comments from generated code
-  --no-overwrite                Do not overwrite existing files
-  --hooks                       Enable React Query hooks generation
-  --no-hooks                    Exclude React Query hooks (default)
+# Generate types from a solution
+npx dataverse-type-gen generate --solution "My Solution"
 
-Connection Options:
-  --dataverse-url <url>         Dataverse instance URL
-  -c, --config <path>           Configuration file path
-  --no-config-file              Skip loading configuration file
+# Initialize configuration file
+npx dataverse-type-gen init
 
-Control Options:
-  --dry-run                     Preview what would be generated
-  -q, --quiet                   Suppress non-error output
-  --debug                       Enable debug mode with detailed logging
-  -v, --verbose                 Verbose output
-  --output-format <format>      Output format: text or json
+# Validate setup
+npx dataverse-type-gen validate
 
-Examples:
-  dataverse-type-gen generate --entities account,contact,opportunity
-  dataverse-type-gen generate --publisher your_prefix --dry-run
-  dataverse-type-gen generate --solution MySolution --quiet
-  dataverse-type-gen generate --entities account --debug --output-format json
-  dataverse-type-gen generate --full-metadata --hooks
+# Preview without creating files
+npx dataverse-type-gen generate --entities account --dry-run
 ```
 
-### `init` - Initialize Configuration
-
+For complete options and help:
 ```bash
-dataverse-type-gen init [options]
-
-Options:
-  -o, --output-dir <dir>        Output directory (default: ./generated)
-  -c, --config <path>           Configuration file path
-  -v, --verbose                 Verbose output
-
-Creates:
-  - dataverse.config.json       Configuration file with defaults
-  - ./generated/.gitignore      Ignore generated files in git
-```
-
-### `validate` - Validate Setup
-
-```bash
-dataverse-type-gen validate [options]
-
-Options:
-  -c, --config <path>           Configuration file path
-  -v, --verbose                 Verbose output
-  --debug                       Enable debug mode
-  --output-format <format>      Output format: text or json
-
-Validates:
-  - Environment variables
-  - Dataverse connection
-  - Authentication
-  - Configuration file
-```
-
-### `info` - System Information
-
-```bash
-dataverse-type-gen info
-
-Shows:
-  - Environment variables
-  - Current directory
-  - Node.js version
-  - Package information
+npx dataverse-type-gen --help
+npx dataverse-type-gen generate --help
+npx dataverse-type-gen init --help
+npx dataverse-type-gen validate --help
 ```
 
 ## Configuration
