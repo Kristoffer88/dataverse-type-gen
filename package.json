@@ -1,6 +1,6 @@
 {
     "name": "dataverse-type-gen",
-    "version": "1.1.11",
+    "version": "1.2.0",
     "description": "TypeScript type generator for Dataverse entities and metadata",
     "type": "module",
     "main": "dist/index.js",
