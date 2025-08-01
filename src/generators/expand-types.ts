@@ -113,16 +113,56 @@ export function generateExpandTypes(
     
     lines.push(`}`)
   } else {
-    // Simple mode: Type-safe expand support 
+    // Simple mode: Type-safe expand support with related entity imports when available
     lines.push(`export type ${expandTypeName} = `)
     lines.push(`  | ${expandablePropsTypeName}[]`)
-    lines.push(`  | Partial<Record<${expandablePropsTypeName}, {`)
-    lines.push(`      $select?: string[]`)
-    lines.push(`      $filter?: any`)
-    lines.push(`      $orderby?: any`)
-    lines.push(`      $top?: number`)
-    lines.push(`      $skip?: number`)
-    lines.push(`    }>>`)
+    
+    // Check if we have related entities available for type-safe $select
+    if (Object.keys(entityMetadata.relatedEntities).length > 0) {
+      // Add imports for query types  
+      const queryTypesPath = organizingDirectories 
+        ? getSharedImportPath(entityMetadata.logicalName, 'query-types.js', primaryEntities)
+        : './query-types.js'
+      relatedEntityImports.push(`import type { ODataFilter, ODataOrderBy } from '${queryTypesPath}'`)
+      
+      // Generate type mappings for each relationship with proper $select typing
+      lines.push(`  | {`)
+      Object.entries(entityMetadata.relatedEntities).forEach(([relationshipName, info]) => {
+        // Look up the actual schema name from the processed entities
+        const relatedEntity = entityLookup.get(info.targetEntityLogicalName)
+        if (!relatedEntity) {
+          // Skip this relationship if target entity metadata is not available
+          return
+        }
+        const targetSchemaName = sanitizeInterfaceName(relatedEntity.schemaName)
+        
+        // Add import for the target entity type (skip self-references)
+        if (info.targetEntityLogicalName !== entityMetadata.logicalName) {
+          const entityImportPath = organizingDirectories 
+            ? getEntityImportPath(entityMetadata.logicalName, info.targetEntityLogicalName, primaryEntities, relatedEntitiesDir)
+            : `./related/${relatedEntity.schemaName.toLowerCase()}.js`
+          relatedEntityImports.push(`import type { ${targetSchemaName} } from '${entityImportPath}'`)
+        }
+        
+        lines.push(`      "${relationshipName}"?: {`)
+        lines.push(`        $select?: (keyof ${targetSchemaName})[]`)
+        lines.push(`        $filter?: ODataFilter<${targetSchemaName}>`)
+        lines.push(`        $orderby?: ODataOrderBy<${targetSchemaName}>`)
+        lines.push(`        $top?: number`)
+        lines.push(`        $skip?: number`)
+        lines.push(`      }`)
+      })
+      lines.push(`    }`)
+    } else {
+      // Fallback to generic string[] if no related entities
+      lines.push(`  | Partial<Record<${expandablePropsTypeName}, {`)
+      lines.push(`      $select?: string[]`)
+      lines.push(`      $filter?: any`)
+      lines.push(`      $orderby?: any`)
+      lines.push(`      $top?: number`)
+      lines.push(`      $skip?: number`)
+      lines.push(`    }>>`)
+    }
     
     if (includeComments) {
       lines.push('')

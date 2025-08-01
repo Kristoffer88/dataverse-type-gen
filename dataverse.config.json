@@ -9,7 +9,7 @@
     "includeMetadata": true,
     "includeValidation": true,
     "useExactTypes": true,
-    "generateHooks": false
+    "generateHooks": true
   },
   "cache": {
     "enabled": false,
