@@ -584,7 +584,7 @@ export async function fetchMultipleEntities(
       'PrimaryIdAttribute',
       'PrimaryNameAttribute',
       'EntitySetName'
-    ], onProgress ? (current: number, total: number, item?: string) => {
+    ], onProgress ? (current: number, total: number, item?: string): void => {
       // When attributes are included, entity fetching is just the first phase
       // So we report progress as current/total but with "Basic" prefix to indicate phase
       if (includeAttributes) {

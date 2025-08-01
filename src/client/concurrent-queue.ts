@@ -6,7 +6,7 @@ import { advancedLog } from '../error-logger.js'
 interface QueuedRequest<T> {
   execute: () => Promise<void>
   resolve: (value: T) => void
-  reject: (error: any) => void
+  reject: (error: unknown) => void
   retryCount: number
   maxRetries: number
   priority: number
