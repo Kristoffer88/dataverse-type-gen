@@ -59,3 +59,31 @@ export async function promptForDataverseUrl(logger: SimpleLogger): Promise<strin
   logger.error('Too many invalid attempts. Please check your Dataverse URL and try again.')
   process.exit(1)
 }
+
+/**
+ * Confirm full metadata operation with user
+ */
+export async function confirmFullMetadata(logger: SimpleLogger): Promise<boolean> {
+  logger.warning('⚠️  Full metadata mode will fetch ALL entities from Dataverse (800+ entities)')
+  logger.info('This operation will:')
+  logger.info('  • Take several minutes to complete')
+  logger.info('  • Make thousands of API requests (2,000-5,000+)')
+  logger.info('  • Generate types for system and custom entities')
+  logger.info('  • Only needed for complete cross-entity type safety')
+  console.log()
+  logger.info('Most users should use specific entities instead:')
+  logger.info('  --entities account,contact,opportunity')
+  logger.info('  --publisher your_prefix')
+  logger.info('  --solution "Your Solution"')
+  console.log()
+  
+  const answer = await promptUser('Continue with full metadata generation? (y/N): ')
+  
+  const confirmed = answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes'
+  if (!confirmed) {
+    logger.info('Operation cancelled. Use specific entities for faster generation.')
+    return false
+  }
+  
+  return true
+}

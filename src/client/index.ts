@@ -388,8 +388,32 @@ export async function fetchEntityAttributes(
     
     const basicAttributes = basicData.value
     
-    // Process all attribute types in parallel for much better performance
-    const castPromises = attributeTypes.map(async (attributeType) => {
+    // Smart optimization: Only cast attribute types that actually exist in this entity
+    // This can reduce API calls from 5 per entity to 0-3 per entity on average
+    const existingAttributeTypes = new Set<string>()
+    for (const attr of basicAttributes) {
+      if (attr.AttributeType === 'Picklist') {
+        existingAttributeTypes.add('Microsoft.Dynamics.CRM.PicklistAttributeMetadata')
+      } else if (attr.AttributeType === 'MultiSelectPicklist') {
+        existingAttributeTypes.add('Microsoft.Dynamics.CRM.MultiSelectPicklistAttributeMetadata')
+      } else if (attr.AttributeType === 'State') {
+        existingAttributeTypes.add('Microsoft.Dynamics.CRM.StateAttributeMetadata')
+      } else if (attr.AttributeType === 'Status') {
+        existingAttributeTypes.add('Microsoft.Dynamics.CRM.StatusAttributeMetadata')
+      } else if (attr.AttributeType === 'Lookup' || attr.AttributeType === 'Customer' || attr.AttributeType === 'Owner') {
+        existingAttributeTypes.add('Microsoft.Dynamics.CRM.LookupAttributeMetadata')
+      }
+    }
+    
+    const relevantAttributeTypes = attributeTypes.filter(type => existingAttributeTypes.has(type))
+    
+    if (relevantAttributeTypes.length === 0) {
+      // No special attribute types found - return basic attributes only
+      return basicAttributes
+    }
+    
+    // Process only the relevant attribute types in parallel for much better performance
+    const castPromises = relevantAttributeTypes.map(async (attributeType) => {
       try {
         const castUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes/${attributeType}`
         
@@ -526,7 +550,7 @@ export async function fetchMultipleEntities(
     return []
   }
 
-  const { onProgress, includeAttributes = true } = options
+  const { onProgress, includeAttributes = true, includeRelationships = false } = options
   const cacheEnabled = process.env.DATAVERSE_CACHE_ENABLED === 'true'
   
   console.log(`🔍 [DEBUG] Cache detection: DATAVERSE_CACHE_ENABLED='${process.env.DATAVERSE_CACHE_ENABLED}', cacheEnabled=${cacheEnabled}`)
@@ -565,37 +589,76 @@ export async function fetchMultipleEntities(
       }
     }
   } else {
-    // When cache is disabled, use OR-filter batching for much better performance
-    console.log(`🚀 Cache disabled - using OR-filter batching for optimal performance`)
-    logBatchingAnalysis(entityNames)
-    
-    // First, get basic entity definitions using OR-filter batching
-    basicEntities = await fetchEntitiesWithOrFilter(entityNames, [
-      'LogicalName',
-      'SchemaName', 
-      'DisplayName',
-      'Description',
-      'HasActivities',
-      'HasFeedback',
-      'HasNotes',
-      'IsActivity',
-      'IsCustomEntity',
-      'OwnershipType',
-      'PrimaryIdAttribute',
-      'PrimaryNameAttribute',
-      'EntitySetName'
-    ], onProgress ? (current: number, total: number, item?: string): void => {
-      // When attributes are included, entity fetching is just the first phase
-      // So we report progress as current/total but with "Basic" prefix to indicate phase
-      if (includeAttributes) {
-        onProgress(current, total, `Basic: ${item || ''}`)
-      } else {
-        // When no attributes needed, this is the final progress
-        onProgress(current, total, item)
+    // When cache is disabled, choose approach based on whether relationships are needed
+    if (includeRelationships) {
+      // When relationships are needed, OR-filter batching won't work (relationships require individual calls)
+      // Fall back to individual fetchEntityMetadata calls for complete relationship data
+      console.log(`🔗 Relationships needed - using individual entity calls for ${entityNames.length} entities`)
+      const batchSize = 10 // Much smaller batches for relationship calls to avoid overwhelming Dataverse
+      
+      for (let i = 0; i < entityNames.length; i += batchSize) {
+        const batch = entityNames.slice(i, i + batchSize)
+        
+        const batchPromises = batch.map(entityName => 
+          fetchEntityMetadata(entityName, options).catch(error => {
+            console.warn(`Failed to fetch entity '${entityName}':`, error)
+            return null
+          })
+        )
+        
+        const batchResults = await Promise.all(batchPromises)
+        
+        // Add successful results to entities array
+        for (const result of batchResults) {
+          if (result) {
+            basicEntities.push(result)
+          }
+        }
+        
+        // Report progress after each batch
+        if (onProgress) {
+          const currentCount = Math.min(i + batchSize, entityNames.length)
+          const lastEntityInBatch = batch[batch.length - 1]
+          onProgress(currentCount, entityNames.length, lastEntityInBatch)
+        }
+        
+        // Add delay between batches to avoid overwhelming Dataverse with relationship calls
+        if (i + batchSize < entityNames.length) {
+          await new Promise(resolve => setTimeout(resolve, 500)) // 500ms delay between batches
+        }
       }
-    } : undefined)
+    } else {
+      // When no relationships needed, use OR-filter batching for optimal performance
+      console.log(`🚀 Cache disabled - using OR-filter batching for optimal performance`)
+      
+      // First, get basic entity definitions using OR-filter batching
+      basicEntities = await fetchEntitiesWithOrFilter(entityNames, [
+        'LogicalName',
+        'SchemaName', 
+        'DisplayName',
+        'Description',
+        'HasActivities',
+        'HasFeedback',
+        'HasNotes',
+        'IsActivity',
+        'IsCustomEntity',
+        'OwnershipType',
+        'PrimaryIdAttribute',
+        'PrimaryNameAttribute',
+        'EntitySetName'
+      ], onProgress ? (current: number, total: number, item?: string): void => {
+        // When attributes are included, entity fetching is just the first phase
+        // So we report progress as current/total but with "Basic" prefix to indicate phase
+        if (includeAttributes) {
+          onProgress(current, total, `Basic: ${item || ''}`)
+        } else {
+          // When no attributes needed, this is the final progress
+          onProgress(current, total, item)
+        }
+      } : undefined)
+    }
     
-    console.log(`✅ Fetched ${basicEntities.length}/${entityNames.length} entities using OR-filter batching`)
+    console.log(`✅ Fetched ${basicEntities.length}/${entityNames.length} entities using ${includeRelationships ? 'individual calls (relationships)' : 'OR-filter batching'}`)
   }
 
   // If attributes are needed, fetch them for each entity using the concurrent queue
@@ -605,33 +668,53 @@ export async function fetchMultipleEntities(
     // Track completed entities for accurate progress reporting
     let completedAttributeEntities = 0
     
-    // Process all attribute requests concurrently through the queue
-    const attributePromises = basicEntities.map(async (entity) => {
-      try {
-        const detailedAttributes = await fetchEntityAttributes(entity.LogicalName)
-        entity.Attributes = detailedAttributes
-        
-        // Atomically increment and report progress
-        completedAttributeEntities++
-        if (onProgress) {
-          onProgress(completedAttributeEntities, basicEntities.length, entity.LogicalName)
-        }
-        
-        return entity
-      } catch (error) {
-        console.warn(`Failed to fetch attributes for ${entity.LogicalName}, using basic entity:`, error)
-        
-        // Still increment progress for failed entities
-        completedAttributeEntities++
-        if (onProgress) {
-          onProgress(completedAttributeEntities, basicEntities.length, entity.LogicalName)
-        }
-        
-        return entity // Return basic entity without detailed attributes
-      }
-    })
+    // Process attribute requests in batches to avoid Promise.all() overhead with 875+ entities
+    const batchSize = 50 // Process 50 entities at a time
+    const entitiesWithAttributes: EntityDefinition[] = []
     
-    const entitiesWithAttributes = await Promise.all(attributePromises)
+    for (let i = 0; i < basicEntities.length; i += batchSize) {
+      const batch = basicEntities.slice(i, i + batchSize)
+      
+      const batchPromises = batch.map(async (entity) => {
+        try {
+          const detailedAttributes = await fetchEntityAttributes(entity.LogicalName)
+          entity.Attributes = detailedAttributes
+          
+          // Atomically increment and report progress (only every 1% to avoid spam)
+          completedAttributeEntities++
+          if (onProgress) {
+            const percentComplete = Math.floor((completedAttributeEntities / basicEntities.length) * 100)
+            const prevPercentComplete = Math.floor(((completedAttributeEntities - 1) / basicEntities.length) * 100)
+            
+            // Only report progress when percentage changes, or for the final entity
+            if (percentComplete !== prevPercentComplete || completedAttributeEntities === basicEntities.length) {
+              onProgress(completedAttributeEntities, basicEntities.length, entity.LogicalName)
+            }
+          }
+          
+          return entity
+        } catch (error) {
+          console.warn(`Failed to fetch attributes for ${entity.LogicalName}, using basic entity:`, error)
+          
+          // Still increment progress for failed entities (only every 1% to avoid spam)
+          completedAttributeEntities++
+          if (onProgress) {
+            const percentComplete = Math.floor((completedAttributeEntities / basicEntities.length) * 100)
+            const prevPercentComplete = Math.floor(((completedAttributeEntities - 1) / basicEntities.length) * 100)
+            
+            // Only report progress when percentage changes, or for the final entity
+            if (percentComplete !== prevPercentComplete || completedAttributeEntities === basicEntities.length) {
+              onProgress(completedAttributeEntities, basicEntities.length, entity.LogicalName)
+            }
+          }
+          
+          return entity // Return basic entity without detailed attributes
+        }
+      })
+      
+      const batchResults = await Promise.all(batchPromises)
+      entitiesWithAttributes.push(...batchResults)
+    }
     console.log(`✅ Successfully processed attributes for ${entitiesWithAttributes.length} entities`)
     
     return entitiesWithAttributes

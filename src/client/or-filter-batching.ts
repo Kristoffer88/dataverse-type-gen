@@ -215,9 +215,11 @@ export function calculateOptimalBatching(entityNames: string[]): {
 }
 
 /**
- * Analyze and log batching performance information
+ * Analyze and log batching performance information (debug mode only)
  */
-export function logBatchingAnalysis(entityNames: string[]): void {
+export function logBatchingAnalysis(entityNames: string[], debugMode: boolean = false): void {
+  if (!debugMode) return
+  
   const analysis = calculateOptimalBatching(entityNames)
   
   console.log(`📊 OR-Filter Batching Analysis:`)

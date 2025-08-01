@@ -20,8 +20,9 @@ import {
 } from '../../config/index.js'
 import { SimpleLogger } from '../output/formatters.js'
 import { validateInputs } from '../validation/url-validator.js'
-import { promptForDataverseUrl } from '../prompts/user-prompts.js'
+import { promptForDataverseUrl, confirmFullMetadata } from '../prompts/user-prompts.js'
 import { DEFAULT_CLI_CONFIG, convertToCliConfig, type CLIConfig } from '../config/cli-config.js'
+import { globalRequestQueue } from '../../client/concurrent-queue.js'
 
 /**
  * Generate command implementation
@@ -164,6 +165,14 @@ export async function generateCommand(options: Record<string, unknown>): Promise
     let allEntitiesForLookup: ProcessedEntityMetadata[] = []
     
     if (config.fullMetadata) {
+      // Confirm full metadata operation with user (unless in quiet mode)
+      if (!loggerOptions.quiet) {
+        const confirmed = await confirmFullMetadata(logger)
+        if (!confirmed) {
+          return
+        }
+      }
+      
       // FULL METADATA APPROACH: Fetch ALL entities for complete type safety
       logger.info(`🌍 Using full metadata mode - fetching ALL entities for complete type safety...`)
       logger.info(`⚠️  This will take several minutes due to API rate limiting (respecting Dataverse limits)`)
@@ -393,6 +402,9 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       logger.info(`   ├─ Total size: ${stats.totalSizeKB}KB`)
       logger.info(`   └─ Duration: ${(stats.durationMs / 1000).toFixed(1)}s`)
     }
+    
+    // Log final API request statistics
+    globalRequestQueue.logFinalStats()
     
     logger.success('🎉 Type generation completed successfully!')
     

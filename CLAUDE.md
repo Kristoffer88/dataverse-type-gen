@@ -28,16 +28,16 @@ export DATAVERSE_INSTANCE=https://krapowerppm.crm4.dynamics.com
 **Generate Types Command:**
 ```bash
 # For testing implementations in pcf-demo (use this during development)
-DATAVERSE_INSTANCE=https://krapowerppm.crm4.dynamics.com node dist/bin/cli.cjs generate --entities pum_initiative,pum_gantttask --generate-related-entities
+DATAVERSE_INSTANCE=https://krapowerppm.crm4.dynamics.com node dist/bin/cli.cjs generate --entities pum_initiative,pum_gantttask
 
 # Generate types using configuration file
 node dist/bin/cli.cjs generate --config dataverse.config.json
 
 # Alternative: Generate specific entities
-node dist/bin/cli.cjs generate --entities pum_initiative,pum_program,pum_portfolio --generate-related-entities
+node dist/bin/cli.cjs generate --entities pum_initiative,pum_program,pum_portfolio
 
 # Alternative: Generate by publisher prefix
-node dist/bin/cli.cjs generate --publisher pum --generate-related-entities
+node dist/bin/cli.cjs generate --publisher pum
 ```
 
 **Configuration File:**
