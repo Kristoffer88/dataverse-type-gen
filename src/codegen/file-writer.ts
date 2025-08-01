@@ -478,7 +478,15 @@ export type ODataFilter<TEntity> = {
 export type ODataSelect<TEntity> = (keyof TEntity)[]
 
 // Generic fallback - entity-specific types should override this
-export type ODataExpand<TMetadata = any> = string[] | Record<string, any>
+export type ODataExpand<TMetadata = any> = 
+  | string[]
+  | Record<string, {
+      $select?: string[]
+      $filter?: any
+      $orderby?: any
+      $top?: number
+      $skip?: number
+    }>
 
 export type ODataOrderBy<TEntity> = {
   [K in keyof TEntity]?: 'asc' | 'desc'

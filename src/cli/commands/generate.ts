@@ -1,9 +1,11 @@
 import { 
   fetchEntityMetadata,
+  fetchMultipleEntities,
   fetchPublisherEntities,
   fetchSolutionEntities,
   fetchAllEntities,
-  fetchAllEntityMetadata
+  fetchAllEntityMetadata,
+  type ProgressCallback
 } from '../../client/index.js'
 import { processEntityMetadata, type ProcessedEntityMetadata } from '../../processors/index.js'
 import { 
@@ -258,18 +260,18 @@ export async function generateCommand(options: Record<string, unknown>): Promise
           logger.info(`📥 Found ${relatedEntityNames.size} related entities to process...`)
           
           const relatedEntityNamesArray = Array.from(relatedEntityNames)
-          for (let i = 0; i < relatedEntityNamesArray.length; i++) {
-            const entityName = relatedEntityNamesArray[i]
-            if (!loggerOptions.quiet) {
-              logger.progress(i + 1, relatedEntityNamesArray.length, `Related: ${entityName}`)
-            }
-            
+          
+          // Use the new batch processing with OR-filter optimization
+          const relatedEntities = await fetchMultipleEntities(relatedEntityNamesArray, {
+            includeAttributes: true,
+            onProgress: loggerOptions.quiet ? undefined : ((current: number, total: number, entityName?: string) => {
+              logger.progress(current, total, `Related: ${entityName}`)
+            }) as ProgressCallback
+          })
+          
+          // Process the batched results
+          for (const rawMetadata of relatedEntities) {
             try {
-              const rawMetadata = await fetchEntityMetadata(entityName, {
-                includeAttributes: true,
-                includeRelationships: true
-              })
-              
               if (rawMetadata) {
                 // Apply special configuration for systemuser to exclude system audit relationships
                 const processingOptions = rawMetadata.LogicalName === 'systemuser' 
@@ -278,13 +280,11 @@ export async function generateCommand(options: Record<string, unknown>): Promise
                 
                 const processed = processEntityMetadata(rawMetadata, processingOptions)
                 allEntitiesForLookup.push(processed)
-                logger.verboseDebug(`✅ Processed related entity ${entityName} (${processed.attributes.length} attributes)`)
-              } else {
-                logger.warning(`Related entity ${entityName} not found`)
+                logger.verboseDebug(`✅ Processed related entity ${rawMetadata.LogicalName} (${processed.attributes.length} attributes)`)
               }
               
             } catch (error) {
-              logger.warning(`Failed to process related entity ${entityName}: ${error instanceof Error ? error.message : String(error)}`)
+              logger.warning(`Failed to process related entity ${rawMetadata?.LogicalName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`)
             }
           }
           

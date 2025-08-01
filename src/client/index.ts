@@ -1,6 +1,8 @@
 import type { EntityDefinition, AttributeMetadata } from '../types.js'
 import { createAuthenticatedFetcher } from '../auth/index.js'
 import { advancedLog, getStatusCodeDescription } from '../error-logger.js'
+import { globalRequestQueue } from './concurrent-queue.js'
+import { fetchEntitiesWithOrFilter, logBatchingAnalysis } from './or-filter-batching.js'
 
 // Create authenticated fetcher instance
 const authenticatedFetch = createAuthenticatedFetcher()
@@ -354,6 +356,8 @@ export async function fetchMultipleEntitiesWithRelated(
  * Fetch entity attributes with proper casting for specific attribute types
  * This is essential for getting full picklist option data
  * 
+ * Uses parallel processing for attribute type casting to improve performance
+ * 
  * @param entityLogicalName - The logical name of the entity
  * @param attributeTypes - Specific attribute types to cast (optional)
  * @returns Promise<AttributeMetadata[]>
@@ -373,19 +377,19 @@ export async function fetchEntityAttributes(
     // First fetch all attributes with basic information including AttributeOf for auxiliary filtering
     const basicUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,Description,AttributeType,IsCustomAttribute,IsValidForCreate,IsValidForRead,IsValidForUpdate,RequiredLevel,IsPrimaryId,IsPrimaryName,AttributeOf`
     
-    const basicResponse = await authenticatedFetch(basicUrl, { method: 'GET' })
+    const basicData = await globalRequestQueue.execute<{ value: AttributeMetadata[] }>(
+      () => authenticatedFetch(basicUrl, { method: 'GET' }),
+      { 
+        url: basicUrl, 
+        method: 'GET',
+        priority: 2 // High priority for basic attributes
+      }
+    )
     
-    if (!basicResponse.ok) {
-      await advancedLog(basicResponse, basicUrl, 'GET')
-      const statusDescription = getStatusCodeDescription(basicResponse.status)
-      throw new Error(`Failed to fetch basic attributes for '${entityLogicalName}': ${basicResponse.status} ${basicResponse.statusText} - ${statusDescription}`)
-    }
-    
-    const basicData = await basicResponse.json() as { value: AttributeMetadata[] }
     const basicAttributes = basicData.value
     
-    // For each attribute type that needs casting, fetch detailed information SEQUENTIALLY
-    for (const attributeType of attributeTypes) {
+    // Process all attribute types in parallel for much better performance
+    const castPromises = attributeTypes.map(async (attributeType) => {
       try {
         const castUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes/${attributeType}`
         
@@ -394,30 +398,34 @@ export async function fetchEntityAttributes(
           ? '?$expand=OptionSet' 
           : ''
         
-        const castResponse = await authenticatedFetch(`${castUrl}${expandParams}`, { method: 'GET' })
-        
-        if (castResponse.ok) {
-          const castData = await castResponse.json() as { value: AttributeMetadata[] }
-          
-          // Merge cast attributes with basic attributes
-          for (const castAttr of castData.value) {
-            const basicIndex = basicAttributes.findIndex(attr => attr.LogicalName === castAttr.LogicalName)
-            if (basicIndex >= 0) {
-              // Replace basic attribute with cast version that has full details
-              basicAttributes[basicIndex] = { ...basicAttributes[basicIndex], ...castAttr }
-            }
+        const castData = await globalRequestQueue.execute<{ value: AttributeMetadata[] }>(
+          () => authenticatedFetch(`${castUrl}${expandParams}`, { method: 'GET' }),
+          {
+            url: `${castUrl}${expandParams}`,
+            method: 'GET',
+            priority: 1, // Lower priority than basic attributes
+            maxRetries: 2 // Fewer retries for attribute casting (non-critical)
           }
-        }
+        )
         
-        // Add small delay between attribute type fetches only when cache is disabled
-        const cacheEnabled = process.env.DATAVERSE_CACHE_ENABLED === 'true'
-        if (!cacheEnabled) {
-          await new Promise(resolve => setTimeout(resolve, 20)) // Reduced from 50ms to 20ms
-        }
-        
-        // If casting fails, continue with basic attributes (non-critical)
+        return castData.value || []
       } catch (castError) {
         console.warn(`Failed to cast attributes for type ${attributeType} on entity ${entityLogicalName}:`, castError)
+        return []
+      }
+    })
+    
+    // Wait for all attribute type casting to complete
+    const castResults = await Promise.all(castPromises)
+    
+    // Merge all cast attributes with basic attributes
+    for (const castAttributes of castResults) {
+      for (const castAttr of castAttributes) {
+        const basicIndex = basicAttributes.findIndex(attr => attr.LogicalName === castAttr.LogicalName)
+        if (basicIndex >= 0) {
+          // Replace basic attribute with cast version that has full details
+          basicAttributes[basicIndex] = { ...basicAttributes[basicIndex], ...castAttr }
+        }
       }
     }
     
@@ -441,22 +449,23 @@ export async function fetchGlobalOptionSet(optionSetName: string): Promise<Globa
   try {
     const url = `/api/data/v9.2/GlobalOptionSetDefinitions(Name='${optionSetName}')`
     
-    const response = await authenticatedFetch(url, { method: 'GET' })
+    const optionSetData = await globalRequestQueue.execute<GlobalOptionSetDefinition>(
+      () => authenticatedFetch(url, { method: 'GET' }),
+      { 
+        url, 
+        method: 'GET',
+        priority: 0 // Normal priority for option sets
+      }
+    )
     
-    if (response.status === 404) {
-      return null // Option set not found
-    }
-    
-    if (!response.ok) {
-      await advancedLog(response, url, 'GET')
-      const statusDescription = getStatusCodeDescription(response.status)
-      throw new Error(`Failed to fetch global option set '${optionSetName}': ${response.status} ${response.statusText} - ${statusDescription}`)
-    }
-    
-    const optionSetData = await response.json() as GlobalOptionSetDefinition
     return optionSetData
     
   } catch (error) {
+    // Check if it's a 404 (option set not found) - this is expected sometimes
+    if (error instanceof Error && error.message.includes('404')) {
+      return null
+    }
+    
     if (error instanceof Error) {
       throw new Error(`Error fetching global option set '${optionSetName}': ${error.message}`)
     }
@@ -503,6 +512,8 @@ export async function fetchPublisherEntities(
 /**
  * Fetch multiple entities by logical names
  * 
+ * Uses OR-filter batching for optimal performance when cache is disabled
+ * 
  * @param entityNames - Array of entity logical names
  * @param options - Options for customizing the fetch
  * @returns Promise<EntityDefinition[]>
@@ -511,47 +522,102 @@ export async function fetchMultipleEntities(
   entityNames: string[],
   options: FetchEntityMetadataOptions & { onProgress?: ProgressCallback } = {}
 ): Promise<EntityDefinition[]> {
-  const entities: EntityDefinition[] = []
-  const { onProgress } = options
-  
-  // Process entities in batches - much larger batches when cache is enabled
+  if (entityNames.length === 0) {
+    return []
+  }
+
+  const { onProgress, includeAttributes = true } = options
   const cacheEnabled = process.env.DATAVERSE_CACHE_ENABLED === 'true'
-  const batchSize = cacheEnabled ? 100 : 10  // 100 when cached, 10 for API calls (each entity makes ~5 requests = 50 max concurrent)
-  for (let i = 0; i < entityNames.length; i += batchSize) {
-    const batch = entityNames.slice(i, i + batchSize)
+  
+  console.log(`🔍 [DEBUG] Cache detection: DATAVERSE_CACHE_ENABLED='${process.env.DATAVERSE_CACHE_ENABLED}', cacheEnabled=${cacheEnabled}`)
+  
+  let basicEntities: EntityDefinition[] = []
+
+  if (cacheEnabled) {
+    // When cache is enabled, use the original approach with larger batches
+    console.log(`📦 Cache enabled - using traditional batching for ${entityNames.length} entities`)
+    const batchSize = 100
     
-    const batchPromises = batch.map(entityName => 
-      fetchEntityMetadata(entityName, options).catch(error => {
-        console.warn(`Failed to fetch entity '${entityName}':`, error)
-        return null
-      })
-    )
-    
-    const batchResults = await Promise.all(batchPromises)
-    
-    // Add successful results to entities array
-    for (const result of batchResults) {
-      if (result) {
-        entities.push(result)
+    for (let i = 0; i < entityNames.length; i += batchSize) {
+      const batch = entityNames.slice(i, i + batchSize)
+      
+      const batchPromises = batch.map(entityName => 
+        fetchEntityMetadata(entityName, options).catch(error => {
+          console.warn(`Failed to fetch entity '${entityName}':`, error)
+          return null
+        })
+      )
+      
+      const batchResults = await Promise.all(batchPromises)
+      
+      // Add successful results to entities array
+      for (const result of batchResults) {
+        if (result) {
+          basicEntities.push(result)
+        }
+      }
+      
+      // Report progress after each batch
+      if (onProgress) {
+        const currentCount = Math.min(i + batchSize, entityNames.length)
+        const lastEntityInBatch = batch[batch.length - 1]
+        onProgress(currentCount, entityNames.length, lastEntityInBatch)
       }
     }
+  } else {
+    // When cache is disabled, use OR-filter batching for much better performance
+    console.log(`🚀 Cache disabled - using OR-filter batching for optimal performance`)
+    logBatchingAnalysis(entityNames)
     
-    // Report progress after each batch
-    if (onProgress) {
-      const currentCount = Math.min(i + batchSize, entityNames.length)
-      const lastEntityInBatch = batch[batch.length - 1]
-      onProgress(currentCount, entityNames.length, lastEntityInBatch)
-    }
+    // First, get basic entity definitions using OR-filter batching
+    basicEntities = await fetchEntitiesWithOrFilter(entityNames, [
+      'LogicalName',
+      'SchemaName', 
+      'DisplayName',
+      'Description',
+      'HasActivities',
+      'HasFeedback',
+      'HasNotes',
+      'IsActivity',
+      'IsCustomEntity',
+      'OwnershipType',
+      'PrimaryIdAttribute',
+      'PrimaryNameAttribute',
+      'EntitySetName'
+    ])
     
-    // Add delay between batches only when hitting the API (not when using cache)
-    if (!cacheEnabled && i + batchSize < entityNames.length) {
-      // With 8000 requests per 300 seconds, we can make ~26 requests per second max
-      // Using batch size 10 with 100ms delay = reasonable throughput while respecting limits  
-      await new Promise(resolve => setTimeout(resolve, 100))
-    }
+    console.log(`✅ Fetched ${basicEntities.length}/${entityNames.length} entities using OR-filter batching`)
+  }
+
+  // If attributes are needed, fetch them for each entity using the concurrent queue
+  if (includeAttributes && basicEntities.length > 0) {
+    console.log(`📋 Fetching detailed attributes for ${basicEntities.length} entities using concurrent processing...`)
+    
+    // Process all attribute requests concurrently through the queue
+    const attributePromises = basicEntities.map(async (entity, index) => {
+      try {
+        const detailedAttributes = await fetchEntityAttributes(entity.LogicalName)
+        entity.Attributes = detailedAttributes
+        
+        // Report progress for attribute fetching
+        if (onProgress) {
+          onProgress(index + 1, basicEntities.length, entity.LogicalName)
+        }
+        
+        return entity
+      } catch (error) {
+        console.warn(`Failed to fetch attributes for ${entity.LogicalName}, using basic entity:`, error)
+        return entity // Return basic entity without detailed attributes
+      }
+    })
+    
+    const entitiesWithAttributes = await Promise.all(attributePromises)
+    console.log(`✅ Successfully processed attributes for ${entitiesWithAttributes.length} entities`)
+    
+    return entitiesWithAttributes
   }
   
-  return entities
+  return basicEntities
 }
 
 /**

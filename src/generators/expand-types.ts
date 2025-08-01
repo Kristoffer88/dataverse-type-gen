@@ -113,15 +113,23 @@ export function generateExpandTypes(
     
     lines.push(`}`)
   } else {
-    // Simple mode: Basic expand support with minimal imports
-    lines.push(`export type ${expandTypeName} = ${expandablePropsTypeName}[] | Record<string, any>`)
+    // Simple mode: Type-safe expand support 
+    lines.push(`export type ${expandTypeName} = `)
+    lines.push(`  | ${expandablePropsTypeName}[]`)
+    lines.push(`  | Partial<Record<${expandablePropsTypeName}, {`)
+    lines.push(`      $select?: string[]`)
+    lines.push(`      $filter?: any`)
+    lines.push(`      $orderby?: any`)
+    lines.push(`      $top?: number`)
+    lines.push(`      $skip?: number`)
+    lines.push(`    }>>`)
     
     if (includeComments) {
       lines.push('')
       lines.push(`/**`)
-      lines.push(` * Basic expand options for ${entityMetadata.displayName}`)
+      lines.push(` * Type-safe expand options for ${entityMetadata.displayName}`)
       lines.push(` * Use string array format: ["relationship1", "relationship2"]`)
-      lines.push(` * Or object format (no type safety): { "relationship": { $select: [...] } }`)
+      lines.push(` * Or object format with type safety: { "relationship": { $select: [...] } }`)
       lines.push(` */`)
     }
   }
