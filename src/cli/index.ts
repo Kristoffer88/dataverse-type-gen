@@ -18,7 +18,7 @@ export function setupCLI(): Command {
   program
     .name('dataverse-type-gen')
     .description('Generate TypeScript types from Dataverse metadata')
-    .version('1.0.0')
+    .version('1.2.0')
   
   // Generate command
   program
