@@ -46,7 +46,6 @@
         "@typescript-eslint/eslint-plugin": "^8.38.0",
         "@typescript-eslint/parser": "^8.38.0",
         "eslint": "^9.31.0",
-        "knip": "^5.62.0",
         "tsup": "^8.3.5",
         "typescript": "^5.8.0",
         "vitest": "^3.2.4"
