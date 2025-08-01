@@ -24,7 +24,7 @@ export async function generateIndexFile(
       // Get relative path from output directory
       const relativePath = relative(config.outputDir, file.filePath)
       const exportPath = relativePath.replace(/\.(ts|d\.ts)$/, '')
-      lines.push(`export * from './${exportPath}'`)
+      lines.push(`export * from './${exportPath.replaceAll('\\', '/')}'`)
     }
 
     const content = lines.join('\n') + '\n'
