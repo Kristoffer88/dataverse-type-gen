@@ -1,9 +1,7 @@
 // Core types and interfaces
 export * from './types.js'
-export * from './generator.js'
 export * from './metadata-client.js'
 export * from './error-logger.js'
-export * from './validation.js'
 
 // Authentication and API client
 export * from './auth/index.js'

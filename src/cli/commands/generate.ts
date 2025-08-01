@@ -27,6 +27,7 @@ import { DEFAULT_CLI_CONFIG, convertToCliConfig, type CLIConfig } from '../confi
  * Generate command implementation
  */
 export async function generateCommand(options: Record<string, unknown>): Promise<void> {
+  const commandStartTime = Date.now()
   const loggerOptions = {
     verbose: Boolean(options.verbose),
     debug: Boolean(options.debug),
@@ -364,12 +365,14 @@ export async function generateCommand(options: Record<string, unknown>): Promise
     }
     
     // Enhanced statistics reporting
+    const totalDurationMs = Date.now() - commandStartTime
     const stats = {
       totalFiles: result.totalFiles,
       successful: result.successfulFiles,
       failed: result.failedFiles,
       totalSizeKB: Math.round(result.totalSize / 1024),
-      durationMs: result.duration
+      durationMs: totalDurationMs,
+      codeGenDurationMs: result.duration  // Keep the original for debugging if needed
     }
     
     if (loggerOptions.outputFormat === 'json') {
@@ -382,7 +385,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       logger.info(`   ├─ Successful: ✅ ${stats.successful}`)
       logger.info(`   ├─ Failed: ${stats.failed > 0 ? `❌ ${stats.failed}` : '✅ 0'}`)
       logger.info(`   ├─ Total size: ${stats.totalSizeKB}KB`)
-      logger.info(`   └─ Duration: ${stats.durationMs}ms`)
+      logger.info(`   └─ Duration: ${(stats.durationMs / 1000).toFixed(1)}s`)
     }
     
     logger.success('🎉 Type generation completed successfully!')
