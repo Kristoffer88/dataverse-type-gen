@@ -59,8 +59,8 @@ export function buildEntityUrl<TEntity>(
     if (Array.isArray($expand) && $expand.length > 0) {
       params.append('$expand', $expand.join(','))
     } else if (typeof $expand === 'object' && Object.keys($expand).length > 0) {
-      // Handle object format - for now just use keys, full implementation would be in buildExpand
-      params.append('$expand', Object.keys($expand).join(','))
+      // Handle object format with recursive expansion support
+      params.append('$expand', buildExpandString($expand))
     }
   }
   
@@ -107,8 +107,8 @@ export function buildEntitySetUrl<TEntity>(
     if (Array.isArray($expand) && $expand.length > 0) {
       params.append('$expand', $expand.join(','))
     } else if (typeof $expand === 'object' && Object.keys($expand).length > 0) {
-      // Handle object format - for now just use keys, full implementation would be in buildExpand
-      params.append('$expand', Object.keys($expand).join(','))
+      // Handle object format with recursive expansion support
+      params.append('$expand', buildExpandString($expand))
     }
   }
   
@@ -427,6 +427,66 @@ function formatValue(value: unknown): string {
   }
   
   return `'${String(value)}'`
+}
+
+/**
+ * Build OData expand string with support for recursive nested expands
+ */
+function buildExpandString(expand: Record<string, any>): string {
+  return Object.entries(expand)
+    .map(([relationshipName, options]) => {
+      if (!options || typeof options !== 'object') {
+        return relationshipName
+      }
+      
+      const nestedParams: string[] = []
+      
+      if (options.$select && Array.isArray(options.$select)) {
+        nestedParams.push(`$select=${options.$select.join(',')}`)
+      }
+      
+      if (options.$filter) {
+        const filterString = buildFilterString(options.$filter)
+        if (filterString) {
+          nestedParams.push(`$filter=${filterString}`)
+        }
+      }
+      
+      if (options.$orderby) {
+        if (Array.isArray(options.$orderby)) {
+          nestedParams.push(`$orderby=${options.$orderby.join(',')}`)
+        } else if (typeof options.$orderby === 'object') {
+          const orderbyString = Object.entries(options.$orderby)
+            .map(([field, direction]) => `${field} ${direction}`)
+            .join(',')
+          if (orderbyString) {
+            nestedParams.push(`$orderby=${orderbyString}`)
+          }
+        }
+      }
+      
+      if (options.$top !== undefined) {
+        nestedParams.push(`$top=${options.$top}`)
+      }
+      
+      // Handle recursive nested expands
+      if (options.$expand) {
+        const nestedExpand = typeof options.$expand === 'object' && !Array.isArray(options.$expand)
+          ? buildExpandString(options.$expand)
+          : Array.isArray(options.$expand) 
+            ? options.$expand.join(',')
+            : String(options.$expand)
+        
+        if (nestedExpand) {
+          nestedParams.push(`$expand=${nestedExpand}`)
+        }
+      }
+      
+      return nestedParams.length > 0 
+        ? `${relationshipName}(${nestedParams.join(';')})`
+        : relationshipName
+    })
+    .join(',')
 }
 
 /**

@@ -12,7 +12,7 @@
     "generateHooks": true
   },
   "cache": {
-    "enabled": false,
+    "enabled": true,
     "ttlHours": 168,
     "maxSizeMB": 500
   }

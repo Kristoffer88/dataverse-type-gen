@@ -124,7 +124,7 @@ export function generateEntityFile(
     : undefined
 
   // Generate expand types for type-safe $expand operations
-  const expandResult = generateExpandTypes(entityMetadata, options, allEntities)
+  const expandResult = generateExpandTypes(entityMetadata, options, allEntities, 3, 0)
   const expandTypes = expandResult.expandTypes
   
   // Add related entity imports to the imports set

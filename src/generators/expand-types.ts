@@ -9,13 +9,17 @@ import { getEntityImportPath, getSharedImportPath, shouldOrganizeDirectories } f
 export function generateExpandTypes(
   entityMetadata: ProcessedEntityMetadata,
   options: TypeGenerationOptions = {},
-  allEntities: ProcessedEntityMetadata[] = []
+  allEntities: ProcessedEntityMetadata[] = [],
+  maxDepth: number = 3,
+  currentDepth: number = 0
 ): { expandTypes: string, relatedEntityImports: string[] } {
   const { includeComments = true, fullMetadata = false, primaryEntities = [], relatedEntitiesDir = 'related' } = options
   const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, fullMetadata, primaryEntities)
   const lines: string[] = []
   const schemaName = sanitizeInterfaceName(entityMetadata.schemaName)
   const relatedEntityImports: string[] = []
+  
+  // Depth limiting prevents infinite recursion
   
   // Create lookup dictionary from actual metadata instead of hardcoded mapping
   const entityLookup = new Map<string, ProcessedEntityMetadata>()
@@ -107,6 +111,21 @@ export function generateExpandTypes(
         lines.push(`    $filter?: ODataFilter<${targetSchemaName}>`)
         lines.push(`    $orderby?: ODataOrderBy<${targetSchemaName}>`)
         lines.push(`    $top?: number`)
+        
+        // Add recursive expand support if we haven't reached max depth
+        if (currentDepth < maxDepth) {
+          const expandTypeName = `${targetSchemaName}Expand`
+          lines.push(`    $expand?: ${expandTypeName}`)
+          
+          // Add import for the target entity's expand type (skip self-references to avoid circular imports)
+          if (info.targetEntityLogicalName !== entityMetadata.logicalName) {
+            const entityImportPath = organizingDirectories 
+              ? getEntityImportPath(entityMetadata.logicalName, info.targetEntityLogicalName, primaryEntities, relatedEntitiesDir)
+              : `./${relatedEntity.schemaName.toLowerCase()}.js`
+            relatedEntityImports.push(`import type { ${expandTypeName} } from '${entityImportPath}'`)
+          }
+        }
+        
         lines.push(`  }`)
       })
     }
@@ -150,6 +169,21 @@ export function generateExpandTypes(
         lines.push(`        $orderby?: ODataOrderBy<${targetSchemaName}>`)
         lines.push(`        $top?: number`)
         lines.push(`        $skip?: number`)
+        
+        // Add recursive expand support in simple mode too
+        if (currentDepth < maxDepth) {
+          const expandTypeName = `${targetSchemaName}Expand`
+          lines.push(`        $expand?: ${expandTypeName}`)
+          
+          // Add import for the target entity's expand type (skip self-references to avoid circular imports)
+          if (info.targetEntityLogicalName !== entityMetadata.logicalName) {
+            const entityImportPath = organizingDirectories 
+              ? getEntityImportPath(entityMetadata.logicalName, info.targetEntityLogicalName, primaryEntities, relatedEntitiesDir)
+              : `./related/${relatedEntity.schemaName.toLowerCase()}.js`
+            relatedEntityImports.push(`import type { ${expandTypeName} } from '${entityImportPath}'`)
+          }
+        }
+        
         lines.push(`      }`)
       })
       lines.push(`    }`)
