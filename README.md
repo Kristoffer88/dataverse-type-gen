@@ -270,21 +270,20 @@ Filtering Options:
   -e, --entities <entities>     Comma-separated entity logical names
   -p, --publisher <prefix>      Publisher prefix to filter entities  
   -s, --solution <name>         Solution name to filter entities
-  --exclude-auxiliary-attributes Exclude auxiliary attributes from interfaces
-  --generate-related-entities   Include related entities in generation
+  --full-metadata               Generate ALL entities for complete type safety
 
 Output Options:
   -o, --output-dir <dir>        Output directory (default: ./generated)
   --file-extension <ext>        File extension (.ts or .d.ts)
   --no-comments                 Exclude comments from generated code
-  --no-metadata                 Exclude metadata objects  
-  --no-validation               Exclude validation functions
   --no-overwrite                Do not overwrite existing files
-  --nested-expand               Generate nested expand types for relationships
+  --hooks                       Enable React Query hooks generation
+  --no-hooks                    Exclude React Query hooks (default)
 
 Connection Options:
   --dataverse-url <url>         Dataverse instance URL
   -c, --config <path>           Configuration file path
+  --no-config-file              Skip loading configuration file
 
 Control Options:
   --dry-run                     Preview what would be generated
@@ -298,6 +297,7 @@ Examples:
   dataverse-type-gen generate --publisher your_prefix --dry-run
   dataverse-type-gen generate --solution MySolution --quiet
   dataverse-type-gen generate --entities account --debug --output-format json
+  dataverse-type-gen generate --full-metadata --hooks
 ```
 
 ### `init` - Initialize Configuration
@@ -351,25 +351,22 @@ Shows:
 
 ```json
 {
+  "dataverseUrl": "https://yourorg.crm.dynamics.com",
   "outputDir": "./generated",
   "fileExtension": ".ts",
-  "includeComments": true,
-  "includeMetadata": true,
-  "includeValidation": true,
-  "excludeAuxiliaryAttributes": true,
-  "generateRelatedEntities": true,
-  "entities": [
-    "account",
-    "contact",
-    "opportunity"
-  ],
+  "entities": ["account", "contact", "opportunity"],
   "publisher": "your_prefix",
   "solution": "Your Solution Name",
-  "typeGenerationOptions": {
+  "fullMetadata": false,
+  "typeGeneration": {
+    "includeComments": true,
     "useExactTypes": true,
-    "nestedExpand": true,
-    "generateHooks": true,
-    "includeBindingTypes": true
+    "generateHooks": false
+  },
+  "cache": {
+    "enabled": false,
+    "ttlHours": 168,
+    "maxSizeMB": 500
   }
 }
 ```
