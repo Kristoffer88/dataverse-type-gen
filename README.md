@@ -1,6 +1,6 @@
 # Dataverse Type Generator
 
-Generate TypeScript types from Microsoft Dataverse metadata with enterprise-grade CLI and programmatic API.
+Generate TypeScript types from Microsoft Dataverse metadata.
 
 > **⚠️ CAUTION: AI-Generated Code**
 > 
@@ -8,20 +8,15 @@ Generate TypeScript types from Microsoft Dataverse metadata with enterprise-grad
 
 ## Features
 
-- 🚀 **CLI Interface**: Command-line tool for automated type generation
-- 🔄 **Live Metadata**: Uses Dataverse Web API endpoints for current data
-- 🎯 **Flexible Filtering**: Generate types by entities, publisher, or solution
-- 📝 **Complete Types**: Interfaces, enums, create/update types, and metadata
-- ⚡ **Performance**: Efficient metadata processing with rate limiting
-- 🔒 **Authentication**: Azure Identity integration for secure access
-- 🛠️ **Development Tools**: Progress indicators, dry-run, debug modes, and JSON output
-- 🎯 **Attribute Filtering**: Exclude auxiliary attributes and support nested expand
+- CLI for automated type generation
+- Generate types by entities, publisher, or solution
+- TypeScript interfaces, enums, create/update types, and metadata
+- Azure Identity integration for authentication
+- Optional React Query hooks
 
 ## Quick Start
 
 ### Basic Usage
-
-**CLI (Recommended):**
 
 ```bash
 # Initialize configuration
@@ -44,25 +39,6 @@ npx dataverse-type-gen generate --entities account --dry-run
 
 ```bash
 npm install dataverse-type-gen
-# or
-pnpm add dataverse-type-gen
-```
-
-**Programmatic API:**
-
-```typescript
-import { generateMultipleEntityTypes } from 'dataverse-type-gen'
-
-// Generate types for specific entities
-const result = await generateMultipleEntityTypes(processedEntities, {
-  outputDir: './types',
-  fileExtension: '.ts',
-  typeGenerationOptions: {
-    includeComments: true,
-    includeMetadata: true,
-    includeValidation: true
-  }
-})
 ```
 
 ### Environment Setup
@@ -78,9 +54,7 @@ Or specify via CLI:
 npx dataverse-type-gen generate --dataverse-url https://yourorg.crm.dynamics.com --entities account
 ```
 
-## CLI Features
-
-### 🎯 Options
+## CLI Options
 
 ```bash
 # Dry-run mode - preview without creating files
@@ -96,7 +70,7 @@ npx dataverse-type-gen generate --entities account --debug
 npx dataverse-type-gen generate --entities account --output-format json
 ```
 
-### ⚙️ Configuration
+### Configuration
 
 ```bash
 # Custom output directory and file extension
@@ -231,13 +205,13 @@ const countUrl = AccountQueries.buildCountUrl({
 })
 ```
 
-**Query Builder Benefits:**
+Query Builder Benefits:
 
-- ✅ **Transparent**: Generated code is visible and modifiable
-- ✅ **Debuggable**: No abstraction layer to troubleshoot
-- ✅ **Customizable**: Edit generated functions for specific needs
-- ✅ **Type-safe**: TypeScript support with entity-specific types
-- ✅ **Self-contained**: Each entity has its own query logic
+- Generated code is visible and modifiable
+- No abstraction layer to troubleshoot
+- Edit generated functions for specific needs
+- TypeScript support with entity-specific types
+- Each entity has its own query logic
 
 **Migration from DataverseUrls:**
 
@@ -253,7 +227,7 @@ const url = AccountQueries.buildListUrl(options)
 
 ## Additional Features
 
-### 🧹 Auxiliary Attribute Filtering  
+### Auxiliary Attribute Filtering  
 
 Clean up generated interfaces by filtering out auxiliary attributes:
 
@@ -285,7 +259,7 @@ export interface Account {
 }
 ```
 
-### 🔗 Nested Expand Support
+### Nested Expand Support
 
 Generate complete type definitions for complex entity relationships:
 
