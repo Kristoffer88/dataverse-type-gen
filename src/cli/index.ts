@@ -34,6 +34,8 @@ export function setupCLI(): Command {
     .option('--no-metadata', 'Exclude metadata objects')
     .option('--no-validation', 'Exclude validation functions')
     .option('--no-overwrite', 'Do not overwrite existing files')
+    .option('--hooks', 'Enable React Query hooks generation (requires @tanstack/react-query)')
+    .option('--no-hooks', 'Exclude React Query hooks generation (default behavior)')
     .option('--full-metadata', 'Generate ALL entities from Dataverse for complete type safety (slower initial run)')
     .option('-c, --config <path>', 'Configuration file path')
     .option('--no-config-file', 'Skip loading configuration file (use only CLI arguments and defaults)')

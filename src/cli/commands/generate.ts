@@ -74,6 +74,11 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       config.fullMetadata = Boolean(options.fullMetadata)
     }
     
+    // Handle hook generation options (--hooks enables, --no-hooks disables)
+    if (options.hooks !== undefined) {
+      config.generateHooks = Boolean(options.hooks)
+    }
+    
     // Validate inputs before proceeding
     await validateInputs(config, logger)
     
@@ -330,6 +335,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
         includeComments: config.includeComments,
         includeMetadata: config.includeMetadata,
         includeValidation: config.includeValidation,
+        generateHooks: config.generateHooks,
       }
     }
     

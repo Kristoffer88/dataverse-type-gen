@@ -14,6 +14,7 @@ export interface CLIConfig {
   includeMetadata: boolean
   includeValidation: boolean
   fullMetadata: boolean
+  generateHooks: boolean
   overwrite: boolean
   verbose: boolean
   debug: boolean
@@ -33,6 +34,7 @@ export const DEFAULT_CLI_CONFIG: CLIConfig = {
   includeMetadata: true,
   includeValidation: true,
   fullMetadata: false, // Default to false for performance
+  generateHooks: false, // Default to false - most users don't need React Query hooks
   overwrite: true,
   verbose: false,
   debug: false,
@@ -56,6 +58,7 @@ export function convertToCliConfig(config: DataverseTypeGenConfig): Partial<CLIC
     includeMetadata: config.typeGeneration.includeMetadata ?? true,
     includeValidation: config.typeGeneration.includeValidation ?? true,
     fullMetadata: config.fullMetadata ?? false,
+    generateHooks: config.typeGeneration.generateHooks ?? false,
     overwrite: true, // Always overwrite for CLI
     verbose: false,
     debug: false,

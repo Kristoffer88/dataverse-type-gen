@@ -82,7 +82,7 @@ export const DEFAULT_CONFIG: DataverseTypeGenConfig = {
     includeLookupValues: true,
     includeBindingTypes: true,
     indexFile: true,
-    generateHooks: true,
+    generateHooks: false, // Default disabled - most users don't need React Query hooks
     excludeAuxiliaryAttributes: true // Default to true for cleaner interfaces
   }
 }
@@ -381,7 +381,7 @@ export function toCodeGenConfig(config: DataverseTypeGenConfig): CodeGenConfig {
     prettier: true, // Default to prettier
     eslint: false, // Default to no eslint
     overwrite: true, // Default to overwrite
-    generateHooks: config.typeGeneration.generateHooks ?? true,
+    generateHooks: config.typeGeneration.generateHooks ?? false,
     relatedEntitiesDir: config.relatedEntitiesDir,
     primaryEntities: config.entities || [],
     typeGenerationOptions: {

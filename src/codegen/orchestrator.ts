@@ -20,7 +20,7 @@ export const DEFAULT_CODEGEN_CONFIG: CodeGenConfig = {
   prettier: true,
   eslint: false,
   overwrite: true,
-  generateHooks: true,
+  generateHooks: false, // Default disabled - most users don't need React Query hooks
   relatedEntitiesDir: 'related',
   primaryEntities: [],
   typeGenerationOptions: {
