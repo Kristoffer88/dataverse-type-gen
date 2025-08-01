@@ -2,7 +2,7 @@ import type { EntityDefinition, AttributeMetadata } from '../types.js'
 import { createAuthenticatedFetcher } from '../auth/index.js'
 import { advancedLog, getStatusCodeDescription } from '../error-logger.js'
 import { globalRequestQueue } from './concurrent-queue.js'
-import { fetchEntitiesWithOrFilter, logBatchingAnalysis } from './or-filter-batching.js'
+import { fetchEntitiesWithOrFilter } from './or-filter-batching.js'
 
 // Create authenticated fetcher instance
 const authenticatedFetch = createAuthenticatedFetcher()

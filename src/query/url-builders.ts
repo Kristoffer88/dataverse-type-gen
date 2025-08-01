@@ -432,7 +432,7 @@ function formatValue(value: unknown): string {
 /**
  * Build OData expand string with support for recursive nested expands
  */
-function buildExpandString(expand: Record<string, any>): string {
+function buildExpandString(expand: Record<string, any>): string { // eslint-disable-line @typescript-eslint/no-explicit-any
   return Object.entries(expand)
     .map(([relationshipName, options]) => {
       if (!options || typeof options !== 'object') {

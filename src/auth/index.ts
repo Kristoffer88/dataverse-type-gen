@@ -83,7 +83,6 @@ class CredentialManager {
     try {
       // First try direct Azure CLI call to avoid @azure/identity spawning multiple processes
       const { spawn } = await import('child_process')
-      const { promisify } = await import('util')
       
       return new Promise<string>((resolve, reject) => {
         const azProcess = spawn('az', [

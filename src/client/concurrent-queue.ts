@@ -32,7 +32,7 @@ export interface RateLimitInfo {
 export class ConcurrentRequestQueue {
   private activeRequests = 0
   private readonly maxConcurrent: number
-  private readonly queue: Array<QueuedRequest<any>> = []
+  private readonly queue: Array<QueuedRequest<any>> = [] // eslint-disable-line @typescript-eslint/no-explicit-any
   private rateLimitInfo: RateLimitInfo = {}
   private readonly requestHistory: number[] = []
   private totalRequestsCounter = 0 // Track total API calls made
