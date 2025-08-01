@@ -86,10 +86,10 @@ Examples:
   $ dataverse-type-gen validate --verbose`)
     .action(validateCommand)
   
-  // Cache command group
+  // Cache command group - internal development tool
   const cacheCommand = program
     .command('cache')
-    .description('Manage API response cache for faster testing')
+    .description('[Development] Manage API response cache')
   
   cacheCommand
     .command('status')
@@ -134,7 +134,6 @@ Examples:
       console.log('')
       console.log('🔗 Environment Variables:')
       console.log(`   DATAVERSE_INSTANCE: ${process.env.DATAVERSE_INSTANCE || 'Not set'}`)
-      console.log(`   DATAVERSE_CACHE_ENABLED: ${process.env.DATAVERSE_CACHE_ENABLED || 'Not set (cache disabled)'}`)
       console.log('')
       console.log('📁 Current Directory:', process.cwd())
       console.log('📦 Node Version:', process.version)
@@ -143,7 +142,6 @@ Examples:
       console.log('   - Run: dataverse-type-gen --help')
       console.log('   - Run: dataverse-type-gen init')
       console.log('   - Run: dataverse-type-gen validate')
-      console.log('   - Run: dataverse-type-gen cache status')
     })
   
   return program

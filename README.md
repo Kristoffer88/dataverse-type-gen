@@ -432,7 +432,6 @@ Shows:
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `DATAVERSE_INSTANCE` | Dataverse instance URL | `https://yourorg.crm.dynamics.com` |
-| `DATAVERSE_CACHE_ENABLED` | Enable API caching (development/testing only) | `true` |
 
 ## Authentication
 
