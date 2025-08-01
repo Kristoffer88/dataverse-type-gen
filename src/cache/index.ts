@@ -3,7 +3,14 @@ import crypto from 'crypto'
 /**
  * In-memory cache to avoid duplicate requests during single session
  */
-const memoryCache = new Map<string, Response>()
+interface CachedResponse {
+  body: string
+  status: number
+  statusText: string
+  headers: Record<string, string>
+}
+
+const memoryCache = new Map<string, CachedResponse>()
 
 /**
  * Generate deterministic cache key from request parameters
@@ -45,8 +52,8 @@ export async function getFromCache(url: string, options: RequestInit = {}): Prom
   
   const memoryHit = memoryCache.get(cacheKey)
   if (memoryHit) {
-    // Clone the response to avoid issues with body being consumed
-    return new Response(await memoryHit.clone().text(), {
+    // Return new Response from cached data
+    return new Response(memoryHit.body, {
       status: memoryHit.status,
       statusText: memoryHit.statusText,
       headers: new Headers(memoryHit.headers)
@@ -63,7 +70,23 @@ export async function saveToCache(url: string, options: RequestInit = {}, respon
   const cacheKey = generateCacheKey(url, options)
   
   if (response.ok && response.status === 200) {
-    memoryCache.set(cacheKey, response.clone())
+    // Read the body and save to cache
+    const body = await response.clone().text()
+    
+    // Convert headers to plain object
+    const headers: Record<string, string> = {}
+    response.headers.forEach((value, key) => {
+      headers[key] = value
+    })
+    
+    const cachedResponse: CachedResponse = {
+      body,
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    }
+    
+    memoryCache.set(cacheKey, cachedResponse)
   }
 }
 

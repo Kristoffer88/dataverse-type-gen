@@ -1,7 +1,6 @@
 import '../setup-integration.js' // Validate environment before running tests
 import { describe, it, expect, beforeEach } from 'vitest'
 import { 
-  getAzureAccessToken, 
   getAzureToken, 
   createAuthenticatedFetcher
 } from '../../src/auth/index.js'
@@ -27,12 +26,14 @@ describe('Authentication System', () => {
       expect(token!.length).toBeGreaterThan(0)
     }, 30000) // 30 second timeout for auth
 
-    it('should acquire access token using legacy method', async () => {
-      const token = await getAzureAccessToken(dataverseInstance!)
+    it('should acquire access token using direct function', async () => {
+      const token = await getAzureToken({
+        resourceUrl: dataverseInstance!
+      })
       
       expect(token).toBeTruthy()
       expect(typeof token).toBe('string')
-      expect(token.length).toBeGreaterThan(0)
+      expect(token!.length).toBeGreaterThan(0)
     }, 30000)
 
   })
