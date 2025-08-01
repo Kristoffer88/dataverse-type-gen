@@ -362,11 +362,6 @@ Shows:
     "includeComments": true,
     "useExactTypes": true,
     "generateHooks": false
-  },
-  "cache": {
-    "enabled": false,
-    "ttlHours": 168,
-    "maxSizeMB": 500
   }
 }
 ```
