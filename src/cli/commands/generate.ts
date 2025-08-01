@@ -266,7 +266,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
           const relatedEntities = await fetchMultipleEntities(relatedEntityNamesArray, {
             includeAttributes: true,
             onProgress: loggerOptions.quiet ? undefined : ((current: number, total: number, entityName?: string) => {
-              logger.progress(current, total, `Related: ${entityName}`)
+              logger.progress(current, total, entityName)
             }) as ProgressCallback
           })
           

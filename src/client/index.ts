@@ -584,7 +584,16 @@ export async function fetchMultipleEntities(
       'PrimaryIdAttribute',
       'PrimaryNameAttribute',
       'EntitySetName'
-    ])
+    ], onProgress ? (current: number, total: number, item?: string) => {
+      // When attributes are included, entity fetching is just the first phase
+      // So we report progress as current/total but with "Basic" prefix to indicate phase
+      if (includeAttributes) {
+        onProgress(current, total, `Basic: ${item || ''}`)
+      } else {
+        // When no attributes needed, this is the final progress
+        onProgress(current, total, item)
+      }
+    } : undefined)
     
     console.log(`✅ Fetched ${basicEntities.length}/${entityNames.length} entities using OR-filter batching`)
   }
@@ -593,20 +602,31 @@ export async function fetchMultipleEntities(
   if (includeAttributes && basicEntities.length > 0) {
     console.log(`📋 Fetching detailed attributes for ${basicEntities.length} entities using concurrent processing...`)
     
+    // Track completed entities for accurate progress reporting
+    let completedAttributeEntities = 0
+    
     // Process all attribute requests concurrently through the queue
-    const attributePromises = basicEntities.map(async (entity, index) => {
+    const attributePromises = basicEntities.map(async (entity) => {
       try {
         const detailedAttributes = await fetchEntityAttributes(entity.LogicalName)
         entity.Attributes = detailedAttributes
         
-        // Report progress for attribute fetching
+        // Atomically increment and report progress
+        completedAttributeEntities++
         if (onProgress) {
-          onProgress(index + 1, basicEntities.length, entity.LogicalName)
+          onProgress(completedAttributeEntities, basicEntities.length, entity.LogicalName)
         }
         
         return entity
       } catch (error) {
         console.warn(`Failed to fetch attributes for ${entity.LogicalName}, using basic entity:`, error)
+        
+        // Still increment progress for failed entities
+        completedAttributeEntities++
+        if (onProgress) {
+          onProgress(completedAttributeEntities, basicEntities.length, entity.LogicalName)
+        }
+        
         return entity // Return basic entity without detailed attributes
       }
     })

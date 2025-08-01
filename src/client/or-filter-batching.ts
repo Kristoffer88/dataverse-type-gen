@@ -12,6 +12,11 @@ const authenticatedFetch = createAuthenticatedFetcher()
 const OR_BATCH_SIZE = 15
 
 /**
+ * Progress callback for OR-filter batching
+ */
+export type OrFilterProgressCallback = (current: number, total: number, item?: string) => void
+
+/**
  * Fetch multiple entities using OR filter batching for optimal performance
  * 
  * This leverages the API capability to filter multiple entities in a single request:
@@ -24,6 +29,7 @@ const OR_BATCH_SIZE = 15
  * 
  * @param entityNames - Array of entity logical names to fetch
  * @param select - Fields to select for each entity
+ * @param onProgress - Optional progress callback
  * @returns Promise<EntityDefinition[]>
  */
 export async function fetchEntitiesWithOrFilter(
@@ -42,13 +48,15 @@ export async function fetchEntitiesWithOrFilter(
     'PrimaryIdAttribute',
     'PrimaryNameAttribute',
     'EntitySetName'
-  ]
+  ],
+  onProgress?: OrFilterProgressCallback
 ): Promise<EntityDefinition[]> {
   if (entityNames.length === 0) {
     return []
   }
 
   const allEntities: EntityDefinition[] = []
+  let processedCount = 0
   
   // Process entity names in batches for OR filter
   for (let i = 0; i < entityNames.length; i += OR_BATCH_SIZE) {
@@ -57,6 +65,13 @@ export async function fetchEntitiesWithOrFilter(
     try {
       const batchEntities = await fetchEntityBatchWithOrFilter(batch, select)
       allEntities.push(...batchEntities)
+      processedCount += batch.length
+      
+      // Report progress after each batch
+      if (onProgress) {
+        const lastEntityInBatch = batch[batch.length - 1]
+        onProgress(processedCount, entityNames.length, lastEntityInBatch)
+      }
     } catch (error) {
       console.warn(`Failed to fetch entity batch [${batch.join(', ')}]:`, error)
       
@@ -68,8 +83,20 @@ export async function fetchEntitiesWithOrFilter(
           if (entity) {
             allEntities.push(entity)
           }
+          processedCount++
+          
+          // Report progress for individual fallback requests
+          if (onProgress) {
+            onProgress(processedCount, entityNames.length, entityName)
+          }
         } catch (singleError) {
           console.warn(`Failed to fetch individual entity '${entityName}':`, singleError)
+          processedCount++
+          
+          // Still report progress even for failed entities
+          if (onProgress) {
+            onProgress(processedCount, entityNames.length, entityName)
+          }
         }
       }
     }
