@@ -48,7 +48,7 @@ export async function generateMultipleEntityTypes(
   // Combine primary and related entities for processing
   const allEntities = [...entities, ...relatedEntities]
   
-  console.log(`📝 Generating ${entities.length} primary entity files${relatedEntities.length > 0 ? ` + ${relatedEntities.length} related entity files` : ''}...`)
+  console.log(`Generating ${entities.length} primary entity files${relatedEntities.length > 0 ? ` + ${relatedEntities.length} related entity files` : ''}...`)
   
   // Collect all unique global option sets from all entities
   const globalOptionSetsMap = new Map<string, ProcessedOptionSet>()
@@ -90,7 +90,7 @@ export async function generateMultipleEntityTypes(
     // Only add primary entities - no hooks for related entities
     entities.forEach(entity => entitiesNeedingHooks.add(entity))
     
-    console.log(`🔗 Generating ${entities.length} hooks for primary entities only...`)
+    console.log(`Generating ${entities.length} hooks for primary entities only...`)
   }
   
   // Process entities in batches to avoid overwhelming the system

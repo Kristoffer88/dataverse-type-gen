@@ -1,11 +1,18 @@
 import type { EntityDefinition, AttributeMetadata } from '../types.js'
 import { createAuthenticatedFetcher } from '../auth/index.js'
+import { preAcquireGlobalToken } from '../auth/token-manager.js'
 import { advancedLog, getStatusCodeDescription } from '../error-logger.js'
 import { globalRequestQueue } from './concurrent-queue.js'
 import { fetchEntitiesWithOrFilter } from './or-filter-batching.js'
 
 // Create authenticated fetcher instance
-const authenticatedFetch = createAuthenticatedFetcher()
+function getAuthenticatedFetch() {
+  const dataverseUrl = process.env.DATAVERSE_INSTANCE
+  if (!dataverseUrl) {
+    throw new Error('DATAVERSE_INSTANCE environment variable is required')
+  }
+  return createAuthenticatedFetcher(dataverseUrl)
+}
 
 /**
  * Options for fetching entity metadata
@@ -197,6 +204,7 @@ export async function fetchEntityMetadata(
     
     const url = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')${params.toString() ? `?${params.toString()}` : ''}`
     
+    const authenticatedFetch = getAuthenticatedFetch()
     const response = await authenticatedFetch(url, { method: 'GET' })
     
     if (response.status === 404) {
@@ -267,7 +275,7 @@ export async function fetchAllEntityMetadata(
       ]
     })
     
-    console.log(`📊 Found ${allEntities.length} total entities in Dataverse`)
+    console.log(`Found ${allEntities.length} total entities in Dataverse`)
     
     // Now fetch detailed metadata for each entity if attributes are requested
     if (options.includeAttributes) {
@@ -302,7 +310,7 @@ export async function fetchMultipleEntitiesWithRelated(
 }> {
   const { includeRelatedEntities = false, ...baseOptions } = options
   
-  console.log(`📥 Fetching metadata for ${entityNames.length} primary entities...`)
+  console.log(`Fetching metadata for ${entityNames.length} primary entities...`)
   
   // Fetch primary entities with relationships if needed
   const primaryEntities = await fetchMultipleEntities(entityNames, {
@@ -331,8 +339,8 @@ export async function fetchMultipleEntitiesWithRelated(
     const relatedEntityArray = Array.from(allRelatedEntityNames)
 
     if (relatedEntityArray.length > 0) {
-      console.log(`🔗 Discovering ${relatedEntityArray.length} related entities...`)
-      console.log(`📥 Fetching metadata for related entities...`)
+      console.log(`Discovering ${relatedEntityArray.length} related entities...`)
+      console.log(`Fetching metadata for related entities...`)
       
       // Fetch related entities metadata
       const relatedEntitiesArray = await fetchMultipleEntities(relatedEntityArray, baseOptions)
@@ -378,7 +386,7 @@ export async function fetchEntityAttributes(
     const basicUrl = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes?$select=LogicalName,SchemaName,DisplayName,Description,AttributeType,IsCustomAttribute,IsValidForCreate,IsValidForRead,IsValidForUpdate,RequiredLevel,IsPrimaryId,IsPrimaryName,AttributeOf`
     
     const basicData = await globalRequestQueue.execute<{ value: AttributeMetadata[] }>(
-      () => authenticatedFetch(basicUrl, { method: 'GET' }),
+      () => getAuthenticatedFetch()(basicUrl, { method: 'GET' }),
       { 
         url: basicUrl, 
         method: 'GET',
@@ -423,7 +431,7 @@ export async function fetchEntityAttributes(
           : ''
         
         const castData = await globalRequestQueue.execute<{ value: AttributeMetadata[] }>(
-          () => authenticatedFetch(`${castUrl}${expandParams}`, { method: 'GET' }),
+          () => getAuthenticatedFetch()(`${castUrl}${expandParams}`, { method: 'GET' }),
           {
             url: `${castUrl}${expandParams}`,
             method: 'GET',
@@ -449,7 +457,7 @@ export async function fetchEntityAttributes(
         if (basicIndex >= 0) {
           // Replace basic attribute with cast version that has full details
           basicAttributes[basicIndex] = { ...basicAttributes[basicIndex], ...castAttr }
-        }
+          }
       }
     }
     
@@ -474,7 +482,7 @@ export async function fetchGlobalOptionSet(optionSetName: string): Promise<Globa
     const url = `/api/data/v9.2/GlobalOptionSetDefinitions(Name='${optionSetName}')`
     
     const optionSetData = await globalRequestQueue.execute<GlobalOptionSetDefinition>(
-      () => authenticatedFetch(url, { method: 'GET' }),
+      () => getAuthenticatedFetch()(url, { method: 'GET' }),
       { 
         url, 
         method: 'GET',
@@ -550,17 +558,26 @@ export async function fetchMultipleEntities(
     return []
   }
 
-  const { onProgress, includeAttributes = true, includeRelationships = false } = options
-  const cacheEnabled = process.env.DATAVERSE_CACHE_ENABLED === 'true'
+  // PRE-AUTHENTICATE: This is the key to performance!
+  // Get token once at the start instead of for every request (6-8 seconds each!)
+  const dataverseUrl = process.env.DATAVERSE_INSTANCE
+  if (!dataverseUrl) {
+    throw new Error('DATAVERSE_INSTANCE environment variable is required')
+  }
   
-  console.log(`🔍 [DEBUG] Cache detection: DATAVERSE_CACHE_ENABLED='${process.env.DATAVERSE_CACHE_ENABLED}', cacheEnabled=${cacheEnabled}`)
+  // Pre-authenticate to avoid token delays during batch processing
+  await preAcquireGlobalToken(dataverseUrl)
+
+
+  const { onProgress, includeAttributes = true, includeRelationships = false } = options
   
   let basicEntities: EntityDefinition[] = []
 
-  if (cacheEnabled) {
-    // When cache is enabled, use the original approach with larger batches
-    console.log(`📦 Cache enabled - using traditional batching for ${entityNames.length} entities`)
-    const batchSize = 100
+  if (includeRelationships) {
+    // When relationships are needed, OR-filter batching won't work (relationships require individual calls)
+    // Fall back to individual fetchEntityMetadata calls for complete relationship data
+    console.log(`Relationships needed - using individual entity calls for ${entityNames.length} entities`)
+    const batchSize = 10 // Much smaller batches for relationship calls to avoid overwhelming Dataverse
     
     for (let i = 0; i < entityNames.length; i += batchSize) {
       const batch = entityNames.slice(i, i + batchSize)
@@ -587,83 +604,46 @@ export async function fetchMultipleEntities(
         const lastEntityInBatch = batch[batch.length - 1]
         onProgress(currentCount, entityNames.length, lastEntityInBatch)
       }
+      
+      // Add delay between batches to avoid overwhelming Dataverse with relationship calls
+      if (i + batchSize < entityNames.length) {
+        await new Promise(resolve => setTimeout(resolve, 500)) // 500ms delay between batches
+      }
     }
   } else {
-    // When cache is disabled, choose approach based on whether relationships are needed
-    if (includeRelationships) {
-      // When relationships are needed, OR-filter batching won't work (relationships require individual calls)
-      // Fall back to individual fetchEntityMetadata calls for complete relationship data
-      console.log(`🔗 Relationships needed - using individual entity calls for ${entityNames.length} entities`)
-      const batchSize = 10 // Much smaller batches for relationship calls to avoid overwhelming Dataverse
-      
-      for (let i = 0; i < entityNames.length; i += batchSize) {
-        const batch = entityNames.slice(i, i + batchSize)
-        
-        const batchPromises = batch.map(entityName => 
-          fetchEntityMetadata(entityName, options).catch(error => {
-            console.warn(`Failed to fetch entity '${entityName}':`, error)
-            return null
-          })
-        )
-        
-        const batchResults = await Promise.all(batchPromises)
-        
-        // Add successful results to entities array
-        for (const result of batchResults) {
-          if (result) {
-            basicEntities.push(result)
-          }
-        }
-        
-        // Report progress after each batch
-        if (onProgress) {
-          const currentCount = Math.min(i + batchSize, entityNames.length)
-          const lastEntityInBatch = batch[batch.length - 1]
-          onProgress(currentCount, entityNames.length, lastEntityInBatch)
-        }
-        
-        // Add delay between batches to avoid overwhelming Dataverse with relationship calls
-        if (i + batchSize < entityNames.length) {
-          await new Promise(resolve => setTimeout(resolve, 500)) // 500ms delay between batches
-        }
-      }
-    } else {
-      // When no relationships needed, use OR-filter batching for optimal performance
-      console.log(`🚀 Cache disabled - using OR-filter batching for optimal performance`)
-      
-      // First, get basic entity definitions using OR-filter batching
-      basicEntities = await fetchEntitiesWithOrFilter(entityNames, [
-        'LogicalName',
-        'SchemaName', 
-        'DisplayName',
-        'Description',
-        'HasActivities',
-        'HasFeedback',
-        'HasNotes',
-        'IsActivity',
-        'IsCustomEntity',
-        'OwnershipType',
-        'PrimaryIdAttribute',
-        'PrimaryNameAttribute',
-        'EntitySetName'
-      ], onProgress ? (current: number, total: number, item?: string): void => {
-        // When attributes are included, entity fetching is just the first phase
-        // So we report progress as current/total but with "Basic" prefix to indicate phase
-        if (includeAttributes) {
-          onProgress(current, total, `Basic: ${item || ''}`)
-        } else {
-          // When no attributes needed, this is the final progress
-          onProgress(current, total, item)
-        }
-      } : undefined)
-    }
+    // When no relationships needed, use OR-filter batching for optimal performance
+    console.log(`Using OR-filter batching for optimal performance`)
     
-    console.log(`✅ Fetched ${basicEntities.length}/${entityNames.length} entities using ${includeRelationships ? 'individual calls (relationships)' : 'OR-filter batching'}`)
+    // First, get basic entity definitions using OR-filter batching
+    basicEntities = await fetchEntitiesWithOrFilter(entityNames, [
+      'LogicalName',
+      'SchemaName', 
+      'DisplayName',
+      'Description',
+      'HasActivities',
+      'HasFeedback',
+      'HasNotes',
+      'IsActivity',
+      'IsCustomEntity',
+      'OwnershipType',
+      'PrimaryIdAttribute',
+      'PrimaryNameAttribute',
+      'EntitySetName'
+    ], onProgress ? (current: number, total: number, item?: string): void => {
+      // When attributes are included, entity fetching is just the first phase
+      // So we report progress as current/total but with "Basic" prefix to indicate phase
+      if (includeAttributes) {
+        onProgress(current, total, `Basic: ${item || ''}`)
+      } else {
+        // When no attributes needed, this is the final progress
+        onProgress(current, total, item)
+      }
+    } : undefined)
   }
+  
 
   // If attributes are needed, fetch them for each entity using the concurrent queue
   if (includeAttributes && basicEntities.length > 0) {
-    console.log(`📋 Fetching detailed attributes for ${basicEntities.length} entities using concurrent processing...`)
     
     // Track completed entities for accurate progress reporting
     let completedAttributeEntities = 0
@@ -715,7 +695,6 @@ export async function fetchMultipleEntities(
       const batchResults = await Promise.all(batchPromises)
       entitiesWithAttributes.push(...batchResults)
     }
-    console.log(`✅ Successfully processed attributes for ${entitiesWithAttributes.length} entities`)
     
     return entitiesWithAttributes
   }
@@ -733,6 +712,7 @@ export async function entityExists(entityLogicalName: string): Promise<boolean> 
   try {
     const url = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')?$select=LogicalName`
     
+    const authenticatedFetch = getAuthenticatedFetch()
     const response = await authenticatedFetch(url, { method: 'GET' })
     
     return response.ok
@@ -783,6 +763,7 @@ export async function fetchAllEntities(options: {
     
     const url = `/api/data/v9.2/EntityDefinitions?${params.toString()}`
     
+    const authenticatedFetch = getAuthenticatedFetch()
     const response = await authenticatedFetch(url, { method: 'GET' })
     
     if (!response.ok) {
@@ -815,6 +796,7 @@ export async function findSolution(solutionName: string): Promise<SolutionDefini
     // First try by unique name (most common)
     let url = `/api/data/v9.2/solutions?$filter=uniquename eq '${solutionName}'&$select=solutionid,uniquename,friendlyname,version,publisherid,ismanaged,description`
     
+    const authenticatedFetch = getAuthenticatedFetch()
     let response = await authenticatedFetch(url, { method: 'GET' })
     
     if (!response.ok) {
@@ -877,6 +859,7 @@ export async function fetchSolutionComponents(
     
     const url = `/api/data/v9.2/solutioncomponents?${params.toString()}`
     
+    const authenticatedFetch = getAuthenticatedFetch()
     const response = await authenticatedFetch(url, { method: 'GET' })
     
     if (!response.ok) {
@@ -922,9 +905,8 @@ export async function fetchSolutionEntities(solutionName: string): Promise<Entit
     // Fetch entity metadata for each component
     const entities: EntityDefinition[] = []
     
-    // Process in batches - larger batches when cache is enabled
-    const cacheEnabled = process.env.DATAVERSE_CACHE_ENABLED === 'true'
-    const batchSize = cacheEnabled ? 100 : 15  // 100 when cached, 15 for API calls
+    // Process in batches
+    const batchSize = 15  // Conservative batch size for API calls
     for (let i = 0; i < entityComponents.length; i += batchSize) {
       const batch = entityComponents.slice(i, i + batchSize)
       
@@ -933,7 +915,8 @@ export async function fetchSolutionEntities(solutionName: string): Promise<Entit
           // Use the objectid to fetch the entity metadata by MetadataId
           const url = `/api/data/v9.2/EntityDefinitions?$filter=MetadataId eq ${component.objectid}&$select=LogicalName,SchemaName,DisplayName,Description,IsCustomEntity,PrimaryIdAttribute,PrimaryNameAttribute,EntitySetName`
           
-          const response = await authenticatedFetch(url, { method: 'GET' })
+          const authenticatedFetch = getAuthenticatedFetch()
+    const response = await authenticatedFetch(url, { method: 'GET' })
           
           if (response.ok) {
             const data = await response.json() as { value: EntityDefinition[] }
@@ -957,8 +940,8 @@ export async function fetchSolutionEntities(solutionName: string): Promise<Entit
         }
       }
       
-      // Add delay between batches only when hitting the API (not when using cache)
-      if (!cacheEnabled && i + batchSize < entityComponents.length) {
+      // Add delay between batches to avoid overwhelming the API
+      if (i + batchSize < entityComponents.length) {
         await new Promise(resolve => setTimeout(resolve, 50))
       }
     }

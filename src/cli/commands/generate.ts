@@ -38,16 +38,16 @@ export async function generateCommand(options: Record<string, unknown>): Promise
   const logger = new SimpleLogger(loggerOptions)
   
   try {
-    logger.info('🚀 Starting Dataverse type generation...')
+    logger.info('Starting Dataverse type generation...')
     
     if (options.dryRun) {
-      logger.info('🔍 Running in dry-run mode - no files will be generated')
+      logger.info('Running in dry-run mode - no files will be generated')
     }
     
     // Load configuration using the proper config system (unless --no-config-file is specified)
     const skipConfigFile = options.configFile === false
     if (skipConfigFile) {
-      logger.debugLog('⚠️  Skipping configuration file loading (--no-config-file)')
+      logger.debugLog('Skipping configuration file loading (--no-config-file)')
     }
     
     let configFromFile: Partial<CLIConfig>
@@ -113,11 +113,11 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       }
       
       if (entitiesToProcess.length > 0) {
-        logger.info(`📋 Generating types for specified entities: ${entitiesToProcess.join(', ')}`)
+        logger.info(`Generating types for specified entities: ${entitiesToProcess.join(', ')}`)
       }
       
     } else if (config.publisher) {
-      logger.info(`🔍 Discovering entities for publisher: ${config.publisher}`)
+      logger.info(`Discovering entities for publisher: ${config.publisher}`)
       const publisherEntities = await fetchPublisherEntities(config.publisher)
       entitiesToProcess = publisherEntities.map(e => e.LogicalName)
       logger.success(`Found ${entitiesToProcess.length} entities for publisher ${config.publisher}`)
@@ -127,21 +127,21 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       }
       
     } else if (config.solution) {
-      logger.info(`🔍 Discovering entities for solution: ${config.solution}`)
+      logger.info(`Discovering entities for solution: ${config.solution}`)
       const solutionEntities = await fetchSolutionEntities(config.solution)
       entitiesToProcess = solutionEntities.map(e => e.LogicalName)
       logger.success(`Found ${entitiesToProcess.length} entities for solution ${config.solution}`)
       
     } else {
       logger.warning('No specific entities, publisher, or solution specified. Use --entities, --publisher, or --solution to limit scope.')
-      logger.info('🔍 Fetching all custom entities...')
+      logger.info('Fetching all custom entities...')
       const allEntities = await fetchAllEntities({ customOnly: true })
       entitiesToProcess = allEntities.map(e => e.LogicalName)
       logger.info(`Found ${entitiesToProcess.length} custom entities`)
     }
 
     if (entitiesToProcess.length === 0) {
-      logger.warning('⚠️  No entities found to process')
+      logger.warning('No entities found to process')
       
       if (config.debug) {
         logger.debugLog('Debugging entity discovery:')
@@ -175,7 +175,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       
       // FULL METADATA APPROACH: Fetch ALL entities for complete type safety
       logger.info(`🌍 Using full metadata mode - fetching ALL entities for complete type safety...`)
-      logger.info(`⚠️  This will take several minutes due to API rate limiting (respecting Dataverse limits)`)
+      logger.warning(`This will take several minutes due to API rate limiting (respecting Dataverse limits)`)
       
       const allEntityMetadata = await fetchAllEntityMetadata({
         includeAttributes: true,
@@ -188,7 +188,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       })
       
       // Process all entities
-      logger.info(`📝 Processing ${allEntityMetadata.length} entities...`)
+      logger.info(`Processing ${allEntityMetadata.length} entities...`)
       for (let i = 0; i < allEntityMetadata.length; i++) {
         const entityMetadata = allEntityMetadata[i]
         if (!loggerOptions.quiet && (i % 25 === 0 || i === allEntityMetadata.length - 1)) { // Show progress every 25 entities
@@ -218,7 +218,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       
     } else {
       // ORIGINAL APPROACH: Fetch only specified entities + related entities if enabled
-      logger.info(`📥 Fetching metadata for ${entitiesToProcess.length} specified entities...`)
+      logger.info(`Fetching metadata for ${entitiesToProcess.length} specified entities...`)
       
       for (let i = 0; i < entitiesToProcess.length; i++) {
         const entityName = entitiesToProcess[i]
@@ -240,7 +240,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
             
             const processed = processEntityMetadata(rawMetadata, processingOptions)
             processedEntities.push(processed)
-            logger.verboseDebug(`✅ Processed ${entityName} (${processed.attributes.length} attributes)`)
+            logger.verboseDebug(`Processed ${entityName} (${processed.attributes.length} attributes)`)
           } else {
             logger.warning(`Entity ${entityName} not found`)
           }
@@ -255,24 +255,35 @@ export async function generateCommand(options: Record<string, unknown>): Promise
 
       // Process related entities (always enabled in v1 for better type safety)
       if (processedEntities.length > 0) {
-        logger.info(`🔗 Discovering related entities...`)
+        logger.info(`Discovering related entities...`)
         
         // Collect all unique related entity logical names
         const relatedEntityNames = new Set<string>()
         const processedEntityNames = new Set(processedEntities.map(e => e.logicalName))
         
+        
+        // Ultra-fast approach: collect all targets first, then deduplicate in one pass
+        const allTargets: string[] = []
+        
         for (const entity of processedEntities) {
-          Object.values(entity.relatedEntities).forEach(relatedInfo => {
-            // Only add if not already processed as a primary entity
-            if (!processedEntityNames.has(relatedInfo.targetEntityLogicalName) && 
-                !relatedEntityNames.has(relatedInfo.targetEntityLogicalName)) {
-              relatedEntityNames.add(relatedInfo.targetEntityLogicalName)
-            }
-          })
+          const relationshipTargets = Object.values(entity.relatedEntities)
+          
+          // Just collect all targets - no Set operations in hot loop
+          for (const relatedInfo of relationshipTargets) {
+            allTargets.push(relatedInfo.targetEntityLogicalName)
+          }
         }
         
+        // Single pass deduplication - much faster than checking Sets repeatedly
+        for (const targetName of allTargets) {
+          if (!processedEntityNames.has(targetName)) {
+            relatedEntityNames.add(targetName)
+          }
+        }
+        
+        
         if (relatedEntityNames.size > 0) {
-          logger.info(`📥 Found ${relatedEntityNames.size} related entities to process...`)
+          logger.info(`Found ${relatedEntityNames.size} related entities to process...`)
           
           const relatedEntityNamesArray = Array.from(relatedEntityNames)
           
@@ -295,7 +306,7 @@ export async function generateCommand(options: Record<string, unknown>): Promise
                 
                 const processed = processEntityMetadata(rawMetadata, processingOptions)
                 allEntitiesForLookup.push(processed)
-                logger.verboseDebug(`✅ Processed related entity ${rawMetadata.LogicalName} (${processed.attributes.length} attributes)`)
+                logger.verboseDebug(`Processed related entity ${rawMetadata.LogicalName} (${processed.attributes.length} attributes)`)
               }
               
             } catch (error) {
@@ -317,16 +328,16 @@ export async function generateCommand(options: Record<string, unknown>): Promise
 
     // Generate TypeScript files
     if (config.dryRun) {
-      logger.info(`📋 Dry run: Would generate ${processedEntities.length} TypeScript files in ${config.outputDir}`)
-      logger.info('📊 Dry run summary:')
+      logger.info(`Dry run: Would generate ${processedEntities.length} TypeScript files in ${config.outputDir}`)
+      logger.info('Dry run summary:')
       for (const entity of processedEntities) {
         logger.info(`   - ${entity.logicalName}.${config.fileExtension} (${entity.attributes.length} attributes)`)
       }
-      logger.success('🎉 Dry run completed successfully!')
+      logger.success('Dry run completed successfully!')
       return
     }
     
-    logger.info(`📝 Generating TypeScript files in ${config.outputDir}...`)
+    logger.info(`Generating TypeScript files in ${config.outputDir}...`)
     
     // Convert back to DataverseTypeGenConfig format and use the proper transformation  
     const baseConfig = skipConfigFile ? DEFAULT_CONFIG : await loadConfiguration(options.config as string)
@@ -394,19 +405,19 @@ export async function generateCommand(options: Record<string, unknown>): Promise
       const output = logger.getJsonOutput()
       output.push({ level: 'statistics', ...stats, timestamp: new Date().toISOString() })
     } else {
-      logger.info(`📊 Generation Statistics:`)
+      logger.info(`Generation Statistics:`)
       logger.info(`   │`)
-      logger.info(`   ├─ Total files: ${stats.totalFiles}`)
-      logger.info(`   ├─ Successful: ✅ ${stats.successful}`)
-      logger.info(`   ├─ Failed: ${stats.failed > 0 ? `❌ ${stats.failed}` : '✅ 0'}`)
-      logger.info(`   ├─ Total size: ${stats.totalSizeKB}KB`)
-      logger.info(`   └─ Duration: ${(stats.durationMs / 1000).toFixed(1)}s`)
+      logger.info(`   - Total files: ${stats.totalFiles}`)
+      logger.info(`   - Successful: [OK] ${stats.successful}`)
+      logger.info(`   - Failed: ${stats.failed > 0 ? `❌ ${stats.failed}` : '✅ 0'}`)
+      logger.info(`   - Total size: ${stats.totalSizeKB}KB`)
+      logger.info(`   - Duration: ${(stats.durationMs / 1000).toFixed(1)}s`)
     }
     
     // Log final API request statistics
     globalRequestQueue.logFinalStats()
     
-    logger.success('🎉 Type generation completed successfully!')
+    logger.success('Type generation completed successfully!')
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)

@@ -11,7 +11,13 @@ export interface GetEntityDefinitionsOptions {
 }
 
 // Create a default authenticated fetcher instance
-const authenticatedFetch = createAuthenticatedFetcher()
+function getAuthenticatedFetch() {
+  const dataverseUrl = process.env.DATAVERSE_INSTANCE
+  if (!dataverseUrl) {
+    throw new Error('DATAVERSE_INSTANCE environment variable is required')
+  }
+  return createAuthenticatedFetcher(dataverseUrl)
+}
 
 export async function getEntityDefinitions(
   options: GetEntityDefinitionsOptions = {}
@@ -37,6 +43,7 @@ export async function getEntityDefinitions(
   const url = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl
   
   // Use authenticated fetch with automatic token management and retry logic
+  const authenticatedFetch = getAuthenticatedFetch()
   const response = await authenticatedFetch(url, {
     method: 'GET'
   })

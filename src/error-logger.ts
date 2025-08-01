@@ -48,15 +48,15 @@ export async function advancedLog(response: Response, requestUrl?: string, reque
   console.error('━'.repeat(60))
   console.error(`⏰ Timestamp: ${errorDetails.timestamp}`)
   console.error(`🌐 URL: ${errorDetails.url}`)
-  console.error(`📡 Method: ${errorDetails.method}`)
-  console.error(`💥 Status: ${errorDetails.status} ${errorDetails.statusText}`)
+  console.error(`📋 Method: ${errorDetails.method}`)
+  console.error(`📊 Status: ${errorDetails.status} ${errorDetails.statusText}`)
   
   if (errorDetails.requestId) {
-    console.error(`🔍 Request ID: ${errorDetails.requestId}`)
+    console.error(`🆔 Request ID: ${errorDetails.requestId}`)
   }
   
   if (errorDetails.error) {
-    console.error('📋 Error Details:')
+    console.error('❌ Error Details:')
     console.error(`   Code: ${errorDetails.error.code}`)
     console.error(`   Message: ${errorDetails.error.message}`)
     
@@ -85,7 +85,7 @@ export async function advancedLog(response: Response, requestUrl?: string, reque
     console.error(errorDetails.body)
   }
   
-  console.error('🗂️  Request Headers:')
+  console.error('📋 Request Headers:')
   Object.entries(headers).forEach(([key, value]) => {
     // Don't log sensitive headers
     if (key.toLowerCase().includes('authorization') || key.toLowerCase().includes('cookie')) {

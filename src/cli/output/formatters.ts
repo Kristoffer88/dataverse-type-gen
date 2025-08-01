@@ -18,6 +18,7 @@ export class SimpleLogger {
     this.debug = options.debug || false
     this.quiet = options.quiet || false
     this.outputFormat = options.outputFormat || 'text'
+    
   }
 
   info(message: string): void {
@@ -25,7 +26,7 @@ export class SimpleLogger {
     if (this.outputFormat === 'json') {
       this.jsonOutput.push({ level: 'info', message, timestamp: new Date().toISOString() })
     } else {
-      console.log(`ℹ️  ${message}`)
+      console.log(message)
     }
   }
 
@@ -42,12 +43,12 @@ export class SimpleLogger {
     if (this.outputFormat === 'json') {
       this.jsonOutput.push({ level: 'warning', message, timestamp: new Date().toISOString() })
     } else {
-      console.log(`⚠️  ${message}`)
+      console.log(`⚠️ ${message}`)
     }
   }
 
   error(message: string, actionableHint?: string): void {
-    const fullMessage = actionableHint ? `${message}\n💡 Suggestion: ${actionableHint}` : message
+    const fullMessage = actionableHint ? `${message}\n💡 ${actionableHint}` : message
     if (this.outputFormat === 'json') {
       this.jsonOutput.push({ level: 'error', message: fullMessage, timestamp: new Date().toISOString() })
     } else {
@@ -60,7 +61,7 @@ export class SimpleLogger {
       if (this.outputFormat === 'json') {
         this.jsonOutput.push({ level: 'debug', message, timestamp: new Date().toISOString() })
       } else {
-        console.log(`🔍 [DEBUG] ${message}`)
+        console.log(`🔍 ${message}`)
       }
     }
   }
@@ -98,7 +99,7 @@ export class SimpleLogger {
         timestamp: new Date().toISOString()
       })
     } else {
-      console.log(`📝 ${progressBar} ${current}/${total} (${percentage}%)${itemText}`)
+      console.log(`${progressBar} ${current}/${total} (${percentage}%)${itemText}`)
     }
   }
   
@@ -106,6 +107,6 @@ export class SimpleLogger {
     const width = 20
     const filled = Math.round((percentage / 100) * width)
     const empty = width - filled
-    return `[${'█'.repeat(filled)}${'░'.repeat(empty)}]`
+    return `[${'\u2588'.repeat(filled)}${'\u2591'.repeat(empty)}]`
   }
 }

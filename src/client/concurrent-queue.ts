@@ -41,7 +41,11 @@ export class ConcurrentRequestQueue {
   constructor(maxConcurrent = 25) {
     // Reduced from 50 to 25 to avoid overwhelming Dataverse metadata endpoints
     // 50 concurrent caused 3-8 second response times per request
-    this.maxConcurrent = Math.min(maxConcurrent, 25)
+    
+    // Windows networking may be slower - reduce concurrency further on Windows
+    const platformMaxConcurrent = process.platform === 'win32' ? 15 : 25
+    this.maxConcurrent = Math.min(maxConcurrent, platformMaxConcurrent)
+    
   }
 
   /**
@@ -61,25 +65,13 @@ export class ConcurrentRequestQueue {
     return new Promise<T>((resolve, reject) => {
       const queuedRequest: QueuedRequest<T> = {
         execute: async () => {
-          const requestStartTime = Date.now()
           try {
             this.activeRequests++
             this.totalRequestsCounter++
             this.recordRequest()
             
-            // Log progress every 100 requests or when queue status changes significantly
-            if (this.totalRequestsCounter % 100 === 0 || this.totalRequestsCounter - this.lastProgressLog > 50) {
-              console.log(`🔄 API Progress: ${this.totalRequestsCounter} requests made | Active: ${this.activeRequests}/${this.maxConcurrent} | Queued: ${this.queue.length}`)
-              this.lastProgressLog = this.totalRequestsCounter
-            }
             
             const response = await request()
-            const requestDuration = Date.now() - requestStartTime
-            
-            // Log slow requests (>2s) or rate limiting
-            if (requestDuration > 2000 || response.status === 429) {
-              console.log(`⚠️  Slow/throttled request: ${requestDuration}ms | Status: ${response.status} | Total: ${this.totalRequestsCounter}`)
-            }
             
             this.updateRateLimitInfo(response)
             
@@ -148,8 +140,6 @@ export class ConcurrentRequestQueue {
     if (this.shouldThrottle()) {
       const delay = this.calculateThrottleDelay()
       if (delay > 0) {
-        // Log throttling decisions
-        console.log(`🚦 Throttling: Delaying ${delay}ms | Remaining: ${this.rateLimitInfo.remainingRequests || 'unknown'} | Queue: ${this.queue.length}`)
         setTimeout(() => this.processNext(), delay)
         return
       }
@@ -293,10 +283,7 @@ export class ConcurrentRequestQueue {
    * Log final statistics
    */
   logFinalStats(): void {
-    console.log(`📊 Final Queue Statistics:`)
-    console.log(`   • Total API requests made: ${this.totalRequestsCounter}`)
-    console.log(`   • Requests in last 5 minutes: ${this.requestHistory.length}`)
-    console.log(`   • Final rate limit remaining: ${this.rateLimitInfo.remainingRequests || 'unknown'}`)
+    // Final statistics available via getStatus() if needed
   }
 
   /**

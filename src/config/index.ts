@@ -38,17 +38,6 @@ export interface DataverseTypeGenConfig {
     scopes?: string[]
   }
   
-  /** Cache configuration for API responses */
-  cache?: {
-    /** Enable API response caching for faster testing */
-    enabled?: boolean
-    /** Cache directory (defaults to ~/.dataverse-type-gen/safe-cache) */
-    directory?: string
-    /** Cache TTL in hours (defaults to 2) */
-    ttlHours?: number
-    /** Maximum cache size in MB (defaults to 100) */
-    maxSizeMB?: number
-  }
   
   /** Type generation options */
   typeGeneration: TypeGenerationOptions & {
@@ -118,8 +107,6 @@ export async function loadConfiguration(
   // Apply environment variable overrides
   config = applyEnvironmentVariables(config)
   
-  // Apply cache configuration to environment variables for the cache module
-  applyCacheConfigToEnvironment(config)
   
   return config
 }
@@ -172,7 +159,7 @@ async function loadSingleConfigFile(filePath: string): Promise<Partial<Dataverse
   if (filePath.endsWith('.js') || filePath.endsWith('.mjs') || filePath.endsWith('.ts')) {
     // For JS/TS files, we would need dynamic import
     // For now, show a helpful message
-    console.warn(`⚠️  JavaScript/TypeScript config files (${filePath}) are not yet supported. Please use JSON format.`)
+    console.warn(`⚠️ JavaScript/TypeScript config files (${filePath}) are not yet supported. Please use JSON format.`)
     return null
   }
   
@@ -263,65 +250,10 @@ function applyEnvironmentVariables(config: DataverseTypeGenConfig): DataverseTyp
     }
   }
   
-  // Cache configuration
-  if (process.env.DATAVERSE_CACHE_ENABLED === 'true' || process.env.DATAVERSE_CACHE_ENABLED === 'false') {
-    result.cache = {
-      ...result.cache,
-      enabled: process.env.DATAVERSE_CACHE_ENABLED === 'true'
-    }
-  }
-  
-  if (process.env.DATAVERSE_CACHE_DIR) {
-    result.cache = {
-      ...result.cache,
-      directory: process.env.DATAVERSE_CACHE_DIR
-    }
-  }
-  
-  if (process.env.DATAVERSE_CACHE_TTL_HOURS) {
-    const ttlHours = parseInt(process.env.DATAVERSE_CACHE_TTL_HOURS, 10)
-    if (!isNaN(ttlHours) && ttlHours > 0) {
-      result.cache = {
-        ...result.cache,
-        ttlHours
-      }
-    }
-  }
-  
-  if (process.env.DATAVERSE_CACHE_MAX_SIZE_MB) {
-    const maxSizeMB = parseInt(process.env.DATAVERSE_CACHE_MAX_SIZE_MB, 10)
-    if (!isNaN(maxSizeMB) && maxSizeMB > 0) {
-      result.cache = {
-        ...result.cache,
-        maxSizeMB
-      }
-    }
-  }
   
   return result
 }
 
-/**
- * Apply cache configuration to environment variables
- * This ensures the cache module picks up config-based settings
- */
-function applyCacheConfigToEnvironment(config: DataverseTypeGenConfig): void {
-  if (config.cache?.enabled !== undefined) {
-    process.env.DATAVERSE_CACHE_ENABLED = config.cache.enabled.toString()
-  }
-  
-  if (config.cache?.directory) {
-    process.env.DATAVERSE_CACHE_DIR = config.cache.directory
-  }
-  
-  if (config.cache?.ttlHours !== undefined) {
-    process.env.DATAVERSE_CACHE_TTL_HOURS = config.cache.ttlHours.toString()
-  }
-  
-  if (config.cache?.maxSizeMB !== undefined) {
-    process.env.DATAVERSE_CACHE_MAX_SIZE_MB = config.cache.maxSizeMB.toString()
-  }
-}
 
 /**
  * Validate configuration
@@ -427,11 +359,6 @@ export function createSampleConfig(): DataverseTypeGenConfig {
     entities: ['account', 'contact', 'opportunity'],
     publisher: 'your_publisher_prefix',
     solution: 'your_solution_name',
-    cache: {
-      enabled: false,
-      ttlHours: 2,
-      maxSizeMB: 100
-    },
     typeGeneration: {
       ...DEFAULT_CONFIG.typeGeneration,
       entityPrefix: 'CRM',

@@ -327,11 +327,6 @@ This package uses **Azure Identity** for secure authentication with multiple cre
 
 - **Dataverse User**: App user with read permissions on metadata
 
-### Token Caching
-
-Authentication tokens are handled by the Azure Identity SDK:
-- **Secure storage**: Azure CLI/SDK manages token caching securely
-- **Automatic refresh**: Handles token expiry transparently
 
 ## License
 

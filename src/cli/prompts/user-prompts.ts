@@ -64,7 +64,7 @@ export async function promptForDataverseUrl(logger: SimpleLogger): Promise<strin
  * Confirm full metadata operation with user
  */
 export async function confirmFullMetadata(logger: SimpleLogger): Promise<boolean> {
-  logger.warning('⚠️  Full metadata mode will fetch ALL entities from Dataverse (800+ entities)')
+  logger.warning('Full metadata mode will fetch ALL entities from Dataverse (800+ entities)')
   logger.info('This operation will:')
   logger.info('  • Take several minutes to complete')
   logger.info('  • Make thousands of API requests (2,000-5,000+)')

@@ -14,7 +14,7 @@ export async function initCommand(options: Record<string, unknown>): Promise<voi
   const logger = new SimpleLogger(loggerOptions)
   
   try {
-    logger.info('🚀 Initializing Dataverse type generator...')
+    logger.info('Initializing Dataverse type generator...')
     
     // Create configuration file
     const configPath = (options.config as string) || 'dataverse.config.json'
@@ -70,7 +70,7 @@ export async function initCommand(options: Record<string, unknown>): Promise<voi
     logger.info(`   2. Edit ${configPath} to specify entities, publisher, or solution`)
     logger.info(`   3. Run: npx dataverse-type-gen generate`)
     logger.info(``)
-    logger.success('🎉 Initialization completed!')
+    logger.success('Initialization completed!')
     
   } catch (error) {
     logger.error(`Initialization failed: ${error instanceof Error ? error.message : String(error)}`)

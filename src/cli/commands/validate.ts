@@ -14,7 +14,7 @@ export async function validateCommand(options: Record<string, unknown>): Promise
   const logger = new SimpleLogger(loggerOptions)
   
   try {
-    logger.info('🔍 Validating Dataverse connection and configuration...')
+    logger.info('Validating Dataverse connection and configuration...')
     
     // Check environment variables
     const dataverseUrl = process.env.DATAVERSE_INSTANCE
@@ -26,7 +26,7 @@ export async function validateCommand(options: Record<string, unknown>): Promise
     logger.success(`Dataverse URL configured: ${dataverseUrl}`)
     
     // Test connection by fetching a few entities
-    logger.info('🔗 Testing Dataverse connection...')
+    logger.info('Testing Dataverse connection...')
     
     try {
       const testEntities = await fetchAllEntities({ select: ['LogicalName', 'DisplayName'] })
@@ -59,7 +59,7 @@ export async function validateCommand(options: Record<string, unknown>): Promise
       logger.info(`No configuration file found (using defaults): ${error instanceof Error ? error.message : String(error)}`)
     }
     
-    logger.success('🎉 Validation completed successfully!')
+    logger.success('Validation completed successfully!')
     
   } catch (error) {
     logger.error(`Validation failed: ${error instanceof Error ? error.message : String(error)}`)

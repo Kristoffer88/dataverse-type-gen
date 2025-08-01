@@ -3,7 +3,13 @@ import { createAuthenticatedFetcher } from '../auth/index.js'
 import { globalRequestQueue } from './concurrent-queue.js'
 
 // Create authenticated fetcher instance
-const authenticatedFetch = createAuthenticatedFetcher()
+function getAuthenticatedFetch() {
+  const dataverseUrl = process.env.DATAVERSE_INSTANCE
+  if (!dataverseUrl) {
+    throw new Error('DATAVERSE_INSTANCE environment variable is required')
+  }
+  return createAuthenticatedFetcher(dataverseUrl)
+}
 
 /**
  * Batch size for OR filter conditions
@@ -127,7 +133,7 @@ async function fetchEntityBatchWithOrFilter(
   
   // Use the concurrent queue for this request
   const response = await globalRequestQueue.execute<{ value: EntityDefinition[] }>(
-    () => authenticatedFetch(url, { method: 'GET' }),
+    () => getAuthenticatedFetch()(url, { method: 'GET' }),
     { 
       url, 
       method: 'GET',
@@ -154,7 +160,7 @@ async function fetchSingleEntityWithQueue(
     const url = `/api/data/v9.2/EntityDefinitions(LogicalName='${entityLogicalName}')${params.toString() ? `?${params.toString()}` : ''}`
     
     const response = await globalRequestQueue.execute<EntityDefinition>(
-      () => authenticatedFetch(url, { method: 'GET' }),
+      () => getAuthenticatedFetch()(url, { method: 'GET' }),
       { 
         url, 
         method: 'GET',
@@ -222,7 +228,7 @@ export function logBatchingAnalysis(entityNames: string[], debugMode: boolean = 
   
   const analysis = calculateOptimalBatching(entityNames)
   
-  console.log(`📊 OR-Filter Batching Analysis:`)
+  console.log(`[STATS] OR-Filter Batching Analysis:`)
   console.log(`   • Total entities: ${entityNames.length}`)
   console.log(`   • Optimal batch size: ${analysis.batchSize}`)
   console.log(`   • Estimated API requests: ${analysis.estimatedRequests}`)

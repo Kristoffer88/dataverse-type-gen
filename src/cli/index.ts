@@ -5,7 +5,7 @@ import chalk from 'chalk'
 import { generateCommand } from './commands/generate.js'
 import { initCommand } from './commands/init.js'
 import { validateCommand } from './commands/validate.js'
-import { cacheStatusCommand, cacheClearCommand, cacheCleanupCommand } from './commands/cache.js'
+import { cacheStatusCommand, cacheClearCommand } from './commands/cache.js'
 
 
 
@@ -91,7 +91,7 @@ Examples:
   // Cache command group - internal development tool
   const cacheCommand = program
     .command('cache')
-    .description('[Development] Manage API response cache')
+    .description('[Development] Manage in-memory cache')
   
   cacheCommand
     .command('status')
@@ -107,7 +107,7 @@ Examples:
   
   cacheCommand
     .command('clear')
-    .description('Clear all cached API responses')
+    .description('Clear in-memory cache')
     .option('-v, --verbose', 'Verbose output')
     .option('--debug', 'Enable debug mode')
     .option('--output-format <format>', 'Output format: text or json', 'text')
@@ -116,28 +116,17 @@ Examples:
   $ dataverse-type-gen cache clear`)
     .action(cacheClearCommand)
   
-  cacheCommand
-    .command('cleanup')
-    .description('Remove expired cache files')
-    .option('-v, --verbose', 'Verbose output')
-    .option('--debug', 'Enable debug mode')
-    .option('--output-format <format>', 'Output format: text or json', 'text')
-    .addHelpText('after', `
-Examples:
-  $ dataverse-type-gen cache cleanup`)
-    .action(cacheCleanupCommand)
-  
   // Info command
   program
     .command('info')
     .description('Show information about the type generator')
     .action(() => {
-      console.log(chalk.blue('📋 Dataverse Type Generator'))
+      console.log(chalk.blue('Dataverse Type Generator'))
       console.log('')
-      console.log('🔗 Environment Variables:')
+      console.log('[ENV] Environment Variables:')
       console.log(`   DATAVERSE_INSTANCE: ${process.env.DATAVERSE_INSTANCE || 'Not set'}`)
       console.log('')
-      console.log('📁 Current Directory:', process.cwd())
+      console.log('[DIR] Current Directory:', process.cwd())
       console.log('📦 Node Version:', process.version)
       console.log('')
       console.log('📚 For more information:')
