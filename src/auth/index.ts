@@ -16,8 +16,146 @@ export interface AzureAuthOptions {
   scopes?: string[]
 }
 
+// Token cache interface
+interface TokenCache {
+  token: string
+  expiresOn: Date
+}
 
+/**
+ * Singleton credential manager to avoid spawning multiple Azure CLI processes
+ * Implements application-level token caching and request deduplication
+ */
+class CredentialManager {
+  private static instance: CredentialManager
+  private credential: TokenCredential
+  private tokenCache = new Map<string, TokenCache>()
+  private pendingRequests = new Map<string, Promise<string>>()
 
+  private constructor() {
+    // Create credential chain with optimal ordering for local development
+    // AzureCliCredential first (fast for local dev), then managed identity (production), then default fallback
+    this.credential = new ChainedTokenCredential(
+      new AzureCliCredential(), // Fast for local development
+      new ManagedIdentityCredential(), // For production environments
+      new DefaultAzureCredential() // Final fallback
+    )
+  }
+
+  static getInstance(): CredentialManager {
+    if (!CredentialManager.instance) {
+      CredentialManager.instance = new CredentialManager()
+    }
+    return CredentialManager.instance
+  }
+
+  async getToken(resourceUrl: string): Promise<string> {
+    const normalizedUrl = validateResourceUrl(resourceUrl)
+    const cacheKey = normalizedUrl
+    const cached = this.tokenCache.get(cacheKey)
+    
+    // Check if cached token is still valid (with 5-minute buffer to avoid edge cases)
+    if (cached && cached.expiresOn.getTime() > Date.now() + 5 * 60 * 1000) {
+      return cached.token
+    }
+
+    // Check if there's already a pending request for this resource
+    const pendingRequest = this.pendingRequests.get(cacheKey)
+    if (pendingRequest) {
+      // Wait for the existing request to complete and return its result
+      return await pendingRequest
+    }
+
+    // Create a new token request and store the promise to prevent duplicate requests
+    const tokenPromise = this.fetchFreshToken(normalizedUrl, cacheKey)
+    this.pendingRequests.set(cacheKey, tokenPromise)
+
+    try {
+      const token = await tokenPromise
+      return token
+    } finally {
+      // Clean up the pending request regardless of success/failure
+      this.pendingRequests.delete(cacheKey)
+    }
+  }
+
+  private async fetchFreshToken(normalizedUrl: string, cacheKey: string): Promise<string> {
+    try {
+      // First try direct Azure CLI call to avoid @azure/identity spawning multiple processes
+      const { spawn } = await import('child_process')
+      const { promisify } = await import('util')
+      
+      return new Promise<string>((resolve, reject) => {
+        const azProcess = spawn('az', [
+          'account',
+          'get-access-token',
+          '--resource',
+          normalizedUrl,
+          '--output',
+          'json'
+        ], { stdio: 'pipe' })
+
+        let stdout = ''
+        let stderr = ''
+
+        azProcess.stdout?.on('data', (data) => {
+          stdout += data.toString()
+        })
+
+        azProcess.stderr?.on('data', (data) => {
+          stderr += data.toString()
+        })
+
+        azProcess.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const tokenData = JSON.parse(stdout)
+              const token = tokenData.accessToken
+              const expiresOn = tokenData.expiresOn ? new Date(tokenData.expiresOn) : new Date(Date.now() + 60 * 60 * 1000)
+              
+              this.tokenCache.set(cacheKey, {
+                token,
+                expiresOn
+              })
+              
+              resolve(token)
+            } catch (parseError) {
+              reject(new Error(`Failed to parse Azure CLI token response: ${parseError}`))
+            }
+          } else {
+            reject(new Error(`Azure CLI failed with code ${code}: ${stderr}`))
+          }
+        })
+
+        azProcess.on('error', (error) => {
+          reject(new Error(`Failed to spawn Azure CLI: ${error.message}`))
+        })
+      })
+    } catch (directCliError) {
+      // Fallback to @azure/identity if direct CLI call fails
+      console.warn('Direct Azure CLI call failed, falling back to @azure/identity:', directCliError)
+      
+      const tokenResponse = await this.credential.getToken([`${normalizedUrl}.default`])
+      if (tokenResponse) {
+        this.tokenCache.set(cacheKey, {
+          token: tokenResponse.token,
+          expiresOn: tokenResponse.expiresOnTimestamp ? new Date(tokenResponse.expiresOnTimestamp) : new Date(Date.now() + 60 * 60 * 1000)
+        })
+        return tokenResponse.token
+      }
+
+      throw new Error(`Failed to acquire token for ${normalizedUrl}`)
+    }
+  }
+
+  /**
+   * Clear the token cache (useful for testing or when authentication fails)
+   */
+  clearCache(): void {
+    this.tokenCache.clear()
+    this.pendingRequests.clear()
+  }
+}
 
 /**
  * Validate and sanitize resource URL
@@ -39,39 +177,23 @@ function validateResourceUrl(resourceUrl: string): string {
 }
 
 /**
- * Create credential chain with fallback options
- */
-function createCredentialChain(): TokenCredential {
-  // Create credential chain - try Azure CLI first, then managed identity, then default
-  return new ChainedTokenCredential(
-    new AzureCliCredential(),
-    new ManagedIdentityCredential(),
-    new DefaultAzureCredential()
-  )
-}
-
-/**
  * Get Azure access token for the specified resource using Azure Identity SDK
- * 🔒 SECURITY HARDENED: Input validation, credential chaining, relies on Azure SDK caching
+ * 🔒 SECURITY HARDENED: Input validation, credential chaining, with singleton caching
  */
 export async function getAzureToken(options: AzureAuthOptions): Promise<string | null> {
-  const { resourceUrl, credential, scopes } = options
-  
-  // Validate and normalize resource URL
-  const normalizedResourceUrl = validateResourceUrl(resourceUrl)
+  const { resourceUrl, credential } = options
   
   try {
-    // Use provided credential or create default chain
-    const tokenCredential = credential || createCredentialChain()
-    
-    // Determine scopes - default to resource URL + .default scope
-    const tokenScopes = scopes || [`${normalizedResourceUrl}.default`]
-    
-    // Request token (Azure SDK handles its own secure caching)
-    const tokenResponse = await tokenCredential.getToken(tokenScopes)
-    
-    return tokenResponse?.token || null
-    
+    if (credential) {
+      // If a custom credential is provided, use it directly (no caching for custom credentials)
+      const normalizedResourceUrl = validateResourceUrl(resourceUrl)
+      const tokenScopes = [`${normalizedResourceUrl}.default`]
+      const tokenResponse = await credential.getToken(tokenScopes)
+      return tokenResponse?.token || null
+    } else {
+      // Use the singleton credential manager for default authentication (with caching)
+      return await CredentialManager.getInstance().getToken(resourceUrl)
+    }
   } catch {
     return null
   }
@@ -79,51 +201,34 @@ export async function getAzureToken(options: AzureAuthOptions): Promise<string |
 
 /**
  * Get Azure Access Token with credential chaining fallback
- * 🔒 SECURITY HARDENED: Multiple credential providers with fallback
+ * 🔒 SECURITY HARDENED: Uses singleton credential manager to avoid spawning multiple Azure CLI processes
  * 
  * @param resourceUrl - The Dataverse resource URL (e.g., 'https://yourorg.crm.dynamics.com/')
  * @returns Promise<string> - The access token
  */
 export async function getAzureAccessToken(resourceUrl: string): Promise<string> {
-  // Try the new Azure Identity approach first
-  const token = await getAzureToken({ resourceUrl })
-  if (token) {
-    return token
-  }
-  
-  // If Azure Identity fails, try direct credential creation as fallback
   try {
-    // Create credential chain - try Azure CLI first, then managed identity
-    const credential = new ChainedTokenCredential(
-      new AzureCliCredential(),
-      new ManagedIdentityCredential()
+    // Use the singleton credential manager for optimal performance and caching
+    return await CredentialManager.getInstance().getToken(resourceUrl)
+  } catch (error) {
+    throw new Error(
+      `Failed to acquire Azure access token for resource: ${resourceUrl}\n` +
+      `Error: ${error instanceof Error ? error.message : String(error)}\n` +
+      'Please ensure you are authenticated via:\n' +
+      '- Azure CLI: az login\n' +
+      '- Managed Identity (when running in Azure)\n' +
+      '- Environment variables (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)\n' +
+      '- Visual Studio or VS Code Azure extensions'
     )
-
-    const tokenResponse = await credential.getToken([`${validateResourceUrl(resourceUrl)}.default`])
-    if (tokenResponse?.token) {
-      return tokenResponse.token
-    }
-  } catch {
-    // If chained credential fails, fall back to DefaultAzureCredential
-    try {
-      const defaultCredential = new DefaultAzureCredential()
-      const tokenResponse = await defaultCredential.getToken([`${validateResourceUrl(resourceUrl)}.default`])
-      if (tokenResponse?.token) {
-        return tokenResponse.token
-      }
-    } catch {
-      // Final fallback failed
-    }
   }
-  
-  throw new Error(
-    `Failed to acquire Azure access token for resource: ${resourceUrl}\n` +
-    'Please ensure you are authenticated via:\n' +
-    '- Azure CLI: az login\n' +
-    '- Managed Identity (when running in Azure)\n' +
-    '- Environment variables (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)\n' +
-    '- Visual Studio or VS Code Azure extensions'
-  )
+}
+
+/**
+ * Clear the token cache (useful for testing or when authentication fails)
+ * @deprecated Use CredentialManager.getInstance().clearCache() directly if needed
+ */
+export function clearTokenCache(): void {
+  CredentialManager.getInstance().clearCache()
 }
 
 /**
