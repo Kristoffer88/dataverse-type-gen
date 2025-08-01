@@ -10,9 +10,9 @@ Generate TypeScript types from Microsoft Dataverse metadata.
 
 - CLI for automated type generation
 - Generate types by entities, publisher, or solution
-- TypeScript interfaces, enums, create/update types, and metadata
+- TypeScript interfaces and choice value enums
 - Azure Identity integration for authentication
-- Optional React Query hooks
+- Optional React Query hooks and query builders
 
 ## Quick Start
 
@@ -99,18 +99,6 @@ export interface Account {
   accountcategorycode?: AccountCategoryCode
   // ... all attributes with proper TypeScript types
 }
-
-export interface AccountCreate {
-  name: string
-  telephone1?: string
-  // ... required vs optional fields for creation
-}
-
-export interface AccountUpdate {
-  accountid: string
-  name?: string
-  // ... all fields optional except ID for updates
-}
 ```
 
 ### Choice/Option Set Enums
@@ -125,21 +113,6 @@ export const AccountCategoryCode = {
 export type AccountCategoryCode = (typeof AccountCategoryCode)[keyof typeof AccountCategoryCode]["Value"]
 ```
 
-### Metadata Objects
-
-```typescript
-export const AccountMetadata = {
-  logicalName: 'account',
-  schemaName: 'Account',
-  primaryIdAttribute: 'accountid',
-  primaryNameAttribute: 'name',
-  attributes: {
-    accountid: { type: 'Uniqueidentifier', required: false },
-    name: { type: 'String', required: true, maxLength: 160 },
-    // ... complete attribute metadata
-  }
-} as const
-```
 
 ### Lookup Properties & Bindings
 
