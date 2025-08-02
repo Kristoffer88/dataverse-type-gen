@@ -54,37 +54,6 @@ Or specify via CLI:
 npx dataverse-type-gen generate --dataverse-url https://yourorg.crm.dynamics.com --entities account
 ```
 
-## CLI Options
-
-```bash
-# Dry-run mode - preview without creating files
-npx dataverse-type-gen generate --entities account --dry-run
-
-# Quiet mode - suppress output for automation
-npx dataverse-type-gen generate --publisher pum --quiet
-
-# Debug mode - detailed logging for troubleshooting
-npx dataverse-type-gen generate --entities account --debug
-
-# JSON output - structured data for CI/CD
-npx dataverse-type-gen generate --entities account --output-format json
-```
-
-### Configuration
-
-```bash
-# Custom output directory and file extension
-npx dataverse-type-gen generate --entities account --output-dir ./src/types --file-extension .d.ts
-
-# Configuration file support
-npx dataverse-type-gen generate --config ./dataverse.config.json
-
-# Filter out auxiliary attributes for cleaner interfaces
-npx dataverse-type-gen generate --entities account --exclude-auxiliary-attributes
-
-# Generate with nested expand support for complex relationships
-npx dataverse-type-gen generate --entities account --generate-related-entities --nested-expand
-```
 
 ## Generated Types
 
@@ -186,104 +155,14 @@ Query Builder Benefits:
 - TypeScript support with entity-specific types
 - Each entity has its own query logic
 
-**Migration from DataverseUrls:**
-
-```typescript
-// ❌ Old approach (abstract, hard to debug)
-import { DataverseUrls } from 'dataverse-type-gen'
-const url = DataverseUrls.entitySet(metadata, options)
-
-// ✅ New approach (transparent, modifiable)
-import { AccountQueries } from './generated/queries/account.queries'
-const url = AccountQueries.buildListUrl(options)
-```
 
 ## Additional Features
 
-### Auxiliary Attribute Filtering  
-
-Clean up generated interfaces by filtering out auxiliary attributes:
-
-```bash
-# Generate cleaner interfaces without auxiliary attributes
-npx dataverse-type-gen generate --entities account --exclude-auxiliary-attributes
-```
-
-**Before filtering:**
-```typescript
-export interface Account {
-  accountid?: string
-  name?: string
-  createdbyname?: string        // Auxiliary attribute
-  createdbyyominame?: string    // Auxiliary attribute  
-  modifiedbyname?: string       // Auxiliary attribute
-  // ... 50+ more auxiliary attributes
-}
-```
-
-**After filtering:**
-```typescript
-export interface Account {
-  accountid?: string
-  name?: string
-  createdby?: string           // Primary lookup attribute
-  modifiedby?: string          // Primary lookup attribute
-  // ... only essential attributes
-}
-```
 
 ### Type-Safe Expand Support
 
-Fully type-safe expand with IntelliSense and compile-time validation:
+Query builders support type-safe expand operations with IntelliSense and compile-time validation for related entities.
 
-```typescript
-// ✅ Type-safe expand with field selection and filtering
-const ganttTasks = await fetch(pum_GanttTaskQueries.buildListUrl({
-  $expand: {
-    pum_initiative: {
-      $select: ['pum_name', 'pum_description'], // ✅ IntelliSense for Initiative fields
-      $filter: { statecode: 0 }, // ✅ Type-safe filtering on Initiative
-      $orderby: { createdon: 'desc' }, // ✅ Type-safe ordering
-      $top: 5
-    }
-  }
-}))
-
-// ❌ TypeScript will catch invalid field names:
-// $select: ['invalid_field'] // Error: not assignable to keyof pum_Initiative
-```
-
-## CLI Usage
-
-### Basic Commands
-
-```bash
-# Generate types for specific entities
-npx dataverse-type-gen generate --entities account,contact,opportunity
-
-# Generate types by publisher prefix
-npx dataverse-type-gen generate --publisher your_prefix
-
-# Generate types from a solution
-npx dataverse-type-gen generate --solution "My Solution"
-
-# Initialize configuration file
-npx dataverse-type-gen init
-
-# Validate setup
-npx dataverse-type-gen validate
-
-# Preview without creating files
-npx dataverse-type-gen generate --entities account --dry-run
-```
-
-For complete options and help:
-```bash
-npx dataverse-type-gen --help
-npx dataverse-type-gen generate --help
-npx dataverse-type-gen init --help
-npx dataverse-type-gen validate --help
-```
 
 ## Configuration
 
