@@ -326,6 +326,7 @@ export function toCodeGenConfig(config: DataverseTypeGenConfig): CodeGenConfig {
       includeBindingTypes: config.typeGeneration.includeBindingTypes,
       excludeAuxiliaryAttributes: config.typeGeneration.excludeAuxiliaryAttributes,
       fullMetadata: config.fullMetadata,
+      generateHooks: config.typeGeneration.generateHooks ?? false,
       primaryEntities: config.entities || [],
       relatedEntitiesDir: config.relatedEntitiesDir,
     }

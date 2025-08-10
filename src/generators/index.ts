@@ -25,6 +25,7 @@ export interface TypeGenerationOptions {
   excludeAuxiliaryAttributes?: boolean
   fullMetadata?: boolean
   excludeSystemAuditRelationships?: boolean
+  generateHooks?: boolean
   // Directory structure options
   primaryEntities?: string[]
   relatedEntitiesDir?: string
