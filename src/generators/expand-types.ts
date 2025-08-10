@@ -79,8 +79,8 @@ export function generateExpandTypes(
     
     // Generate type mappings for each relationship
     if (Object.keys(entityMetadata.relatedEntities).length > 0) {
-      // Add imports for query types (only when hooks are enabled and only add once)
-      if (generateHooks && !relatedEntityImports.some(imp => imp.includes('ODataFilter'))) {
+      // Add imports for query types (always include since query-types.ts is always generated)
+      if (!relatedEntityImports.some(imp => imp.includes('ODataFilter'))) {
         const queryTypesPath = organizingDirectories 
           ? getSharedImportPath(entityMetadata.logicalName, 'query-types.js', primaryEntities)
           : './query-types.js'
@@ -108,10 +108,8 @@ export function generateExpandTypes(
         
         lines.push(`  "${relationshipName}"?: {`)
         lines.push(`    $select?: (keyof ${targetSchemaName})[]`)
-        if (generateHooks) {
-          lines.push(`    $filter?: ODataFilter<${targetSchemaName}>`)
-          lines.push(`    $orderby?: ODataOrderBy<${targetSchemaName}>`)
-        }
+        lines.push(`    $filter?: ODataFilter<${targetSchemaName}>`)
+        lines.push(`    $orderby?: ODataOrderBy<${targetSchemaName}>`)
         lines.push(`    $top?: number`)
         
         // Add recursive expand support if we haven't reached max depth
@@ -140,13 +138,11 @@ export function generateExpandTypes(
     
     // Check if we have related entities available for type-safe $select
     if (Object.keys(entityMetadata.relatedEntities).length > 0) {
-      // Add imports for query types (only when hooks are enabled)
-      if (generateHooks) {
-        const queryTypesPath = organizingDirectories 
-          ? getSharedImportPath(entityMetadata.logicalName, 'query-types.js', primaryEntities)
-          : './query-types.js'
-        relatedEntityImports.push(`import type { ODataFilter, ODataOrderBy } from '${queryTypesPath}'`)
-      }
+      // Add imports for query types (always include since query-types.ts is always generated)
+      const queryTypesPath = organizingDirectories 
+        ? getSharedImportPath(entityMetadata.logicalName, 'query-types.js', primaryEntities)
+        : './query-types.js'
+      relatedEntityImports.push(`import type { ODataFilter, ODataOrderBy } from '${queryTypesPath}'`)
       
       // Generate type mappings for each relationship with proper $select typing
       lines.push(`  | {`)
@@ -169,10 +165,8 @@ export function generateExpandTypes(
         
         lines.push(`      "${relationshipName}"?: {`)
         lines.push(`        $select?: (keyof ${targetSchemaName})[]`)
-        if (generateHooks) {
-          lines.push(`        $filter?: ODataFilter<${targetSchemaName}>`)
-          lines.push(`        $orderby?: ODataOrderBy<${targetSchemaName}>`)
-        }
+        lines.push(`        $filter?: ODataFilter<${targetSchemaName}>`)
+        lines.push(`        $orderby?: ODataOrderBy<${targetSchemaName}>`)
         lines.push(`        $top?: number`)
         lines.push(`        $skip?: number`)
         
