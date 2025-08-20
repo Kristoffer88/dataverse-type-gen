@@ -1,0 +1,9 @@
+{
+  "instanceUrl": "https://krapowerppm.crm4.dynamics.com",
+  "entities": ["pum_initiative"],
+  "outputDir": "./test-output-no-hooks",
+  "typeGeneration": {
+    "generateHooks": false,
+    "includeComments": true
+  }
+}

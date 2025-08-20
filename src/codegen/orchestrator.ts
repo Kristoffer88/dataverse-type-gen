@@ -62,7 +62,7 @@ export async function generateMultipleEntityTypes(
   }
   
   // Setup progress tracking for generation
-  const totalExpectedFiles = allEntities.length + (finalConfig.generateHooks ? entities.length * 2 : 0) + globalOptionSetsMap.size + (finalConfig.generateHooks ? 1 : 0) + (finalConfig.indexFile ? 1 : 0)
+  const totalExpectedFiles = allEntities.length + (finalConfig.generateHooks ? entities.length * 2 : 0) + globalOptionSetsMap.size + 1 + (finalConfig.indexFile ? 1 : 0)
   let completedFiles = 0
   
   // Initialize formatting progress if prettier is enabled
@@ -134,11 +134,9 @@ export async function generateMultipleEntityTypes(
     }
   }
 
-  // Generate query-types file if hooks are enabled
-  if (finalConfig.generateHooks) {
-    const queryTypesResult = await writeQueryTypesFile(finalConfig)
-    results.push(queryTypesResult)
-  }
+  // Always generate query-types file (needed for expand types even without hooks)
+  const queryTypesResult = await writeQueryTypesFile(finalConfig)
+  results.push(queryTypesResult)
 
   // Generate index file if requested
   let indexFile: GeneratedFileResult | undefined
