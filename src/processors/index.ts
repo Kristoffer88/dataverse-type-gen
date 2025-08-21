@@ -241,6 +241,10 @@ export function processEntityMetadata(entityMetadata: EntityDefinition, options?
       referencingAttribute: rel.ReferencingAttribute,
       isCustomRelationship: rel.IsCustomRelationship
     }))
+    
+    // Add many-to-one relationship names to expandable properties
+    const manyToOneNames = processed.manyToOneRelationships.map(rel => rel.schemaName)
+    processed.expandableProperties.push(...manyToOneNames)
   }
   
   if (entityMetadata.ManyToManyRelationships) {

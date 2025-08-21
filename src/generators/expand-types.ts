@@ -13,7 +13,7 @@ export function generateExpandTypes(
   maxDepth: number = 3,
   currentDepth: number = 0
 ): { expandTypes: string, relatedEntityImports: string[] } {
-  const { includeComments = true, fullMetadata = false, generateHooks = false, primaryEntities = [], relatedEntitiesDir = 'related' } = options
+  const { includeComments = true, fullMetadata = false, primaryEntities = [], relatedEntitiesDir = 'related' } = options
   const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, fullMetadata, primaryEntities)
   const lines: string[] = []
   const schemaName = sanitizeInterfaceName(entityMetadata.schemaName)
@@ -110,9 +110,12 @@ export function generateExpandTypes(
         lines.push(`    $select?: (keyof ${targetSchemaName})[]`)
         lines.push(`    $filter?: ODataFilter<${targetSchemaName}>`)
         lines.push(`    $orderby?: ODataOrderBy<${targetSchemaName}>`)
-        lines.push(`    $top?: number`)
         
-        // Add recursive expand support if we haven't reached max depth
+        // All relationship types can use $top and $skip
+        lines.push(`    $top?: number`)
+        lines.push(`    $skip?: number`)
+        
+        // Add recursive expand support (nested $expand is allowed for all relationship types)
         if (currentDepth < maxDepth) {
           const expandTypeName = `${targetSchemaName}Expand`
           lines.push(`    $expand?: ${expandTypeName}`)
@@ -167,10 +170,12 @@ export function generateExpandTypes(
         lines.push(`        $select?: (keyof ${targetSchemaName})[]`)
         lines.push(`        $filter?: ODataFilter<${targetSchemaName}>`)
         lines.push(`        $orderby?: ODataOrderBy<${targetSchemaName}>`)
+        
+        // All relationship types can use $top and $skip
         lines.push(`        $top?: number`)
         lines.push(`        $skip?: number`)
         
-        // Add recursive expand support in simple mode too
+        // Add recursive expand support (nested $expand is allowed for all relationship types)
         if (currentDepth < maxDepth) {
           const expandTypeName = `${targetSchemaName}Expand`
           lines.push(`        $expand?: ${expandTypeName}`)

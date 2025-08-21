@@ -113,6 +113,7 @@ jspm_packages/
 
 # Test artifacts
 tmp/
+test-validation/
 
 # Vitest
 .vitest/

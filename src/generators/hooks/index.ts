@@ -62,8 +62,8 @@ export function generateEntityHooks(
   const organizingDirectories = shouldOrganizeDirectories(relatedEntitiesDir, options.fullMetadata ?? false, primaryEntities)
   const entityImportPath = organizingDirectories 
     ? getHooksToEntityImportPath(entityMetadata.logicalName, primaryEntities, relatedEntitiesDir)
-    : `../${entityMetadata.logicalName.toLowerCase()}.js`
-  const queryTypesImportPath = getHooksToSharedImportPath('query-types.js')
+    : `../${entityMetadata.logicalName.toLowerCase()}`
+  const queryTypesImportPath = getHooksToSharedImportPath('query-types')
   
   // Import statements
   lines.push(`import { useQuery } from '@tanstack/react-query'`)
@@ -81,8 +81,8 @@ export function generateEntityHooks(
   // Both hooks and queries follow the same directory structure, so we can use relative paths within each
   const isPrimary = primaryEntities.includes(entityMetadata.logicalName)
   const queryBuildersImportPath = isPrimary 
-    ? `../queries/${entityMetadata.logicalName}.queries.js`    // hooks/entity.hooks.ts → queries/entity.queries.ts
-    : `../${entityMetadata.logicalName}.queries.js`             // hooks/related/entity.hooks.ts → queries/related/entity.queries.ts
+    ? `../queries/${entityMetadata.logicalName}.queries`    // hooks/entity.hooks.ts → queries/entity.queries.ts
+    : `../${entityMetadata.logicalName}.queries`             // hooks/related/entity.hooks.ts → queries/related/entity.queries.ts
   lines.push(`import { ${interfaceName}Queries } from '${queryBuildersImportPath}'`)
   
   // Import related entity types for type-safe expands (only if they exist)

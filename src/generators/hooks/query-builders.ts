@@ -40,8 +40,8 @@ export function generateEntityQueryBuilders(
   // Related entities: queries/related/entity.queries.ts → ../../related/entity.js
   const isPrimary = (options.primaryEntities || []).includes(entityMetadata.logicalName)
   const entityImportPath = isPrimary 
-    ? `../${entityMetadata.logicalName}.js`
-    : `../../related/${entityMetadata.logicalName}.js`
+    ? `../${entityMetadata.logicalName}`
+    : `../../related/${entityMetadata.logicalName}`
     
   lines.push(`import { ${interfaceName}Meta } from '${entityImportPath}'`)
   lines.push(`import type { ${interfaceName}, ${interfaceName}Expand } from '${entityImportPath}'`)
@@ -49,7 +49,7 @@ export function generateEntityQueryBuilders(
   lines.push(`    ODataFilter,`)
   lines.push(`    ODataSelect,`)
   lines.push(`    ODataOrderBy`)
-  lines.push(`} from '../query-types.js'`)
+  lines.push(`} from '../query-types'`)
   lines.push('')
   lines.push(`// Type-safe options for ${interfaceName} operations`)
   lines.push(`type ${interfaceName}ListOptions = {`)
@@ -197,16 +197,11 @@ export function generateQueryHelperFunctions(lines: string[], interfaceName: str
   lines.push(`}`)
   lines.push('')
   
-  // Enhanced build expand function with metadata validation and recursive support
-  lines.push(`// Build OData expand string with support for nested selects, recursive expansion, and relationship validation`)
+  // Enhanced build expand function with recursive support
+  lines.push(`// Build OData expand string with support for nested selects and recursive expansion`)
   lines.push(`const buildExpand = (expand: any): string => {`)
   lines.push(`    if (Array.isArray(expand)) {`)
-  lines.push(`        // Simple array format: ['rel1', 'rel2'] - validate against expandable properties`)
-  lines.push(`        for (const relationshipName of expand) {`)
-  lines.push(`            if (!${interfaceName}Meta.expandableProperties.includes(relationshipName as any)) {`)
-  lines.push(`                throw new Error(\`Unknown relationship '\${relationshipName}'. Available relationships: \${${interfaceName}Meta.expandableProperties.join(', ')}\`)`)
-  lines.push(`            }`)
-  lines.push(`        }`)
+  lines.push(`        // Simple array format: ['rel1', 'rel2'] - let Dataverse validate relationships`)
   lines.push(`        return expand.join(',')`)
   lines.push(`    }`)
   lines.push(`    `)
@@ -214,10 +209,7 @@ export function generateQueryHelperFunctions(lines: string[], interfaceName: str
   lines.push(`        // Object format: { rel1: { $select: ['field1'], $expand: { ... } }, rel2: { $select: ['field2'] } }`)
   lines.push(`        return Object.entries(expand)`)
   lines.push(`            .map(([relationshipName, options]: [string, any]) => {`)
-  lines.push(`                // Validate relationship exists`)
-  lines.push(`                if (!${interfaceName}Meta.expandableProperties.includes(relationshipName as any)) {`)
-  lines.push(`                    throw new Error(\`Unknown relationship '\${relationshipName}'. Available relationships: \${${interfaceName}Meta.expandableProperties.join(', ')}\`)`)
-  lines.push(`                }`)
+  lines.push(`                // Let Dataverse validate relationships at runtime`)
   lines.push(`                `)
   lines.push(`                if (!options || typeof options !== 'object') {`)
   lines.push(`                    return relationshipName`)
@@ -259,22 +251,10 @@ export function generateQueryHelperFunctions(lines: string[], interfaceName: str
   lines.push(`}`)
   lines.push('')
   
-  // Simple filter builder for expand filters (simplified version)
-  lines.push(`// Build filter for expand operations (simplified)`)
+  // Reuse main filter builder for expand operations to support $and/$or
+  lines.push(`// Build filter for expand operations (reuse main filter logic)`)
   lines.push(`const buildExpandFilter = (filter: any): string => {`)
-  lines.push(`    if (typeof filter === 'object' && filter !== null) {`)
-  lines.push(`        return Object.entries(filter)`)
-  lines.push(`            .map(([field, value]) => {`)
-  lines.push(`                if (typeof value === 'object' && value !== null) {`)
-  lines.push(`                    return Object.entries(value)`)
-  lines.push(`                        .map(([op, val]) => \`\${field} \${op.replace('$', '')} \${formatValue(val)}\`)`)
-  lines.push(`                        .join(' and ')`)
-  lines.push(`                }`)
-  lines.push(`                return \`\${field} eq \${formatValue(value)}\``)
-  lines.push(`            })`)
-  lines.push(`            .join(' and ')`)
-  lines.push(`    }`)
-  lines.push(`    return String(filter)`)
+  lines.push(`    return buildFilter(filter)`)
   lines.push(`}`)
   lines.push('')
   
